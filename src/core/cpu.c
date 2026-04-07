@@ -1318,8 +1318,10 @@ int cpu_step(CPU *cpu, MMU *mmu, Cartridge *cart, Timer *timer) {
                 uint16_t addr = read_word(cpu, mmu, cart, timer);
                 if (!(cpu->f & FLAG_Z)) {
                     cpu->pc = addr;
+                    cycles = 16;
+                } else {
+                    cycles = 12;
                 }
-                cycles = 12;
             }
             break;
         case 0xC3: /* JP a16 */
@@ -1380,8 +1382,10 @@ int cpu_step(CPU *cpu, MMU *mmu, Cartridge *cart, Timer *timer) {
                 uint16_t addr = read_word(cpu, mmu, cart, timer);
                 if (cpu->f & FLAG_Z) {
                     cpu->pc = addr;
+                    cycles = 16;
+                } else {
+                    cycles = 12;
                 }
-                cycles = 12;
             }
             break;
         case 0xCB: /* CB prefix */
@@ -1526,8 +1530,10 @@ int cpu_step(CPU *cpu, MMU *mmu, Cartridge *cart, Timer *timer) {
                 uint16_t addr = read_word(cpu, mmu, cart, timer);
                 if (!(cpu->f & FLAG_C)) {
                     cpu->pc = addr;
+                    cycles = 16;
+                } else {
+                    cycles = 12;
                 }
-                cycles = 12;
             }
             break;
         case 0xD3: /* ILLEGAL */
@@ -1589,8 +1595,10 @@ int cpu_step(CPU *cpu, MMU *mmu, Cartridge *cart, Timer *timer) {
                 uint16_t addr = read_word(cpu, mmu, cart, timer);
                 if (cpu->f & FLAG_C) {
                     cpu->pc = addr;
+                    cycles = 16;
+                } else {
+                    cycles = 12;
                 }
-                cycles = 12;
             }
             break;
         case 0xDC: /* CALL C, a16 */
