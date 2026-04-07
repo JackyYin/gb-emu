@@ -64,13 +64,16 @@ uint8_t mmu_read_byte(MMU *mmu, Cartridge *cart, Timer *timer, uint16_t addr) {
     if (addr >= 0xFF04 && addr <= 0xFF07) {
         return mmu->io[addr - 0xFF00];
     }
+    if (addr == 0xFF0F) {
+        return mmu->io[0x0F] | 0xE0;  /* IF: upper 3 bits always read as 1 */
+    }
     if (addr < 0xFF80) {
         return mmu->io[addr - 0xFF00];
     }
     if (addr < 0xFFFF) {
         return mmu->hram[addr - 0xFF80];
     }
-    return mmu->io[0x7F];
+    return mmu->io[0x7F];  /* IE register */
 }
 
 void mmu_write_byte(MMU *mmu, Cartridge *cart, Timer *timer, uint16_t addr, uint8_t value) {
