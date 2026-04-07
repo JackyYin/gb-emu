@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Game Boy Emulator</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Game Boy Emulator</h1>
+        <div class="controls">
+            <input type="file" id="rom-file" accept=".gb,.gbc">
+            <span id="status">Load a ROM to start</span>
+        </div>
+        <canvas id="screen" width="160" height="144"></canvas>
+        <div class="gamepad">
+            <div class="dpad">
+                <button class="btn dpad-btn" data-key="ArrowUp" aria-label="Up">▲</button>
+                <button class="btn dpad-btn" data-key="ArrowLeft" aria-label="Left">◀</button>
+                <button class="btn dpad-btn" data-key="ArrowRight" aria-label="Right">▶</button>
+                <button class="btn dpad-btn" data-key="ArrowDown" aria-label="Down">▼</button>
+            </div>
+            <div class="action-buttons">
+                <button class="btn round-btn" data-key="x" aria-label="B">B</button>
+                <button class="btn round-btn" data-key="z" aria-label="A">A</button>
+            </div>
+            <div class="menu-buttons">
+                <button class="btn pill-btn" data-key="Shift" aria-label="Select">SELECT</button>
+                <button class="btn pill-btn" data-key="Enter" aria-label="Start">START</button>
+            </div>
+        </div>
+        <div class="instructions">
+            <p>Controls: Arrow Keys = D-Pad | Z = A | X = B | Enter = Start | Shift = Select</p>
+        </div>
+    </div>
+    <script type="module" src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,157 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    background: #1a1a2e;
+    color: #eee;
+    font-family: 'Courier New', monospace;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+}
+
+.container {
+    text-align: center;
+    padding: 2rem;
+}
+
+h1 {
+    margin-bottom: 1rem;
+    font-size: 1.5rem;
+    color: #00ff88;
+}
+
+.controls {
+    margin-bottom: 1rem;
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+    align-items: center;
+}
+
+#rom-file {
+    padding: 0.5rem;
+    background: #16213e;
+    color: #eee;
+    border: 1px solid #00ff88;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+#status {
+    font-size: 0.8rem;
+    color: #888;
+}
+
+#screen {
+    border: 2px solid #00ff88;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+    width: 480px;
+    height: 432px;
+    background: #0f3460;
+}
+
+.instructions {
+    margin-top: 1rem;
+    font-size: 0.75rem;
+    color: #666;
+}
+
+.gamepad {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    max-width: 480px;
+    margin: 1.5rem auto 0;
+    padding: 1rem;
+    background: #16213e;
+    border-radius: 8px;
+}
+
+.btn {
+    border: none;
+    cursor: pointer;
+    user-select: none;
+    -webkit-user-select: none;
+    touch-action: manipulation;
+    transition: background 0.1s;
+}
+
+.btn:active {
+    transform: scale(0.95);
+}
+
+.dpad {
+    position: relative;
+    width: 120px;
+    height: 120px;
+}
+
+.dpad-btn {
+    position: absolute;
+    width: 36px;
+    height: 36px;
+    background: #333;
+    color: #eee;
+    border-radius: 4px;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.dpad-btn:active {
+    background: #00ff88;
+    color: #1a1a2e;
+}
+
+.dpad-btn[data-key="ArrowUp"] { top: 0; left: 50%; transform: translateX(-50%); }
+.dpad-btn[data-key="ArrowDown"] { bottom: 0; left: 50%; transform: translateX(-50%); }
+.dpad-btn[data-key="ArrowLeft"] { left: 0; top: 50%; transform: translateY(-50%); }
+.dpad-btn[data-key="ArrowRight"] { right: 0; top: 50%; transform: translateY(-50%); }
+
+.action-buttons {
+    display: flex;
+    gap: 16px;
+    transform: rotate(-25deg);
+}
+
+.round-btn {
+    width: 48px;
+    height: 48px;
+    background: #8b0000;
+    color: #eee;
+    border-radius: 50%;
+    font-size: 14px;
+    font-weight: bold;
+}
+
+.round-btn:active {
+    background: #ff4444;
+}
+
+.menu-buttons {
+    display: flex;
+    gap: 12px;
+}
+
+.pill-btn {
+    width: 56px;
+    height: 20px;
+    background: #333;
+    color: #eee;
+    border-radius: 10px;
+    font-size: 9px;
+    font-weight: bold;
+    letter-spacing: 0.5px;
+}
+
+.pill-btn:active {
+    background: #00ff88;
+    color: #1a1a2e;
+}
