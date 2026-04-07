@@ -54,21 +54,81 @@ uint8_t mmu_read_byte(MMU *mmu, Cartridge *cart, Timer *timer, uint16_t addr) {
             if (mmu->joypad & 0x80) act |= 0x08;  /* Start*/
             nibble = act;
         }
-        return (p1 & 0xF0) | nibble;
+        return 0xC0 | (p1 & 0x30) | nibble;
     }
-    /* Serial transfer Data*/
-    /* Serial transfer Control*/
-    if (addr >= 0xFF01 && addr <= 0xFF02) {
-        return mmu->io[addr - 0xFF00];
-    }
-    if (addr >= 0xFF04 && addr <= 0xFF07) {
-        return mmu->io[addr - 0xFF00];
-    }
-    if (addr == 0xFF0F) {
-        return mmu->io[0x0F] | 0xE0;  /* IF: upper 3 bits always read as 1 */
-    }
+    /*
+     * IO register read masks (0xFF00-0xFF7F):
+     * 0xFF = unmapped (reads as 0xFF)
+     * 0x00 = all bits readable
+     * other = unused bits ORed in on read
+     */
+    static const uint8_t io_read_mask[0x80] = {
+        /* 0xFF00 */ 0x00, /* P1: handled above */
+        /* 0xFF01 */ 0x00, /* SB: Serial data */
+        /* 0xFF02 */ 0x7E, /* SC: bits 1-6 unused */
+        /* 0xFF03 */ 0xFF, /* unmapped */
+        /* 0xFF04 */ 0x00, /* DIV */
+        /* 0xFF05 */ 0x00, /* TIMA */
+        /* 0xFF06 */ 0x00, /* TMA */
+        /* 0xFF07 */ 0xF8, /* TAC: bits 3-7 unused */
+        /* 0xFF08 */ 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, /* 0x08-0x0E unmapped */
+        /* 0xFF0F */ 0xE0, /* IF: bits 5-7 unused */
+        /* 0xFF10 */ 0x80, /* NR10: bit 7 unused */
+        /* 0xFF11 */ 0x00, /* NR11 */
+        /* 0xFF12 */ 0x00, /* NR12 */
+        /* 0xFF13 */ 0x00, /* NR13 */
+        /* 0xFF14 */ 0x00, /* NR14 */
+        /* 0xFF15 */ 0xFF, /* unmapped */
+        /* 0xFF16 */ 0x00, /* NR21 */
+        /* 0xFF17 */ 0x00, /* NR22 */
+        /* 0xFF18 */ 0x00, /* NR23 */
+        /* 0xFF19 */ 0x00, /* NR24 */
+        /* 0xFF1A */ 0x7F, /* NR30: bits 0-6 unused */
+        /* 0xFF1B */ 0x00, /* NR31 */
+        /* 0xFF1C */ 0x9F, /* NR32: bits 0-4,7 unused */
+        /* 0xFF1D */ 0x00, /* NR33 */
+        /* 0xFF1E */ 0x00, /* NR34 */
+        /* 0xFF1F */ 0xFF, /* unmapped */
+        /* 0xFF20 */ 0xC0, /* NR41: bits 6-7 unused */
+        /* 0xFF21 */ 0x00, /* NR42 */
+        /* 0xFF22 */ 0x00, /* NR43 */
+        /* 0xFF23 */ 0x3F, /* NR44: bits 0-5 unused */
+        /* 0xFF24 */ 0x00, /* NR50 */
+        /* 0xFF25 */ 0x00, /* NR51 */
+        /* 0xFF26 */ 0x70, /* NR52: bits 4-6 unused */
+        /* 0xFF27 */ 0xFF, 0xFF, 0xFF, /* 0x27-0x29 unmapped */
+        /* 0xFF2A-0xFF2F */ 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, /* unmapped */
+        /* 0xFF30-0xFF3F: Wave RAM, all bits readable */
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        /* 0xFF40 */ 0x00, /* LCDC */
+        /* 0xFF41 */ 0x80, /* STAT: bit 7 unused */
+        /* 0xFF42 */ 0x00, /* SCY */
+        /* 0xFF43 */ 0x00, /* SCX */
+        /* 0xFF44 */ 0x00, /* LY */
+        /* 0xFF45 */ 0x00, /* LYC */
+        /* 0xFF46 */ 0x00, /* DMA */
+        /* 0xFF47 */ 0x00, /* BGP */
+        /* 0xFF48 */ 0x00, /* OBP0 */
+        /* 0xFF49 */ 0x00, /* OBP1 */
+        /* 0xFF4A */ 0x00, /* WY */
+        /* 0xFF4B */ 0x00, /* WX */
+        /* 0xFF4C-0xFF4F */ 0xFF, 0xFF, 0xFF, 0xFF,
+        /* 0xFF50 */ 0xFF, /* Boot ROM disable: write-only, reads as 0xFF */
+        /* 0xFF51-0xFF7F: unmapped on DMG */
+        0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+        0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+        0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+        0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+        0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+        0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+    };
+
     if (addr < 0xFF80) {
-        return mmu->io[addr - 0xFF00];
+        uint8_t reg = addr - 0xFF00;
+        uint8_t mask = io_read_mask[reg];
+        if (mask == 0xFF) return 0xFF;
+        return mmu->io[reg] | mask;
     }
     if (addr < 0xFFFF) {
         return mmu->hram[addr - 0xFF80];
@@ -172,10 +232,6 @@ void mmu_write_byte(MMU *mmu, Cartridge *cart, Timer *timer, uint16_t addr, uint
         return;
     }
     if (addr < 0xFF80) {
-        if (addr == 0xFF40) {
-            /* LCDC write - sync with PPU */
-            /* printf("LCDC write: 0x%02X (LCD %s)\n", value, (value & 0x80) ? "ON" : "OFF"); */
-        }
         if (addr == 0xFF44) {
             /* printf("trying to reset LY...\n"); */
             mmu->io[0x44] = 0;
