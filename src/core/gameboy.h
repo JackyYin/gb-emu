@@ -95,4 +95,12 @@ void timer_init(MMU *mmu, Timer *timer);
 void serial_tick(MMU *mmu, Serial *serial, uint32_t cycles);
 void serial_init(Serial *serial);
 
+/* Test harness accessors */
+CPU *gb_get_cpu(void);
+MMU *gb_get_mmu(void);
+bool gb_is_test_done(void);
+bool gb_check_mooneye_pass(void);
+char *gb_get_serial_output(void);
+int gb_get_serial_output_len(void);
+
 #endif

@@ -3,6 +3,9 @@
 
 static GameBoy gb;
 static int frame_count = 0;
+static char serial_buf[4096];
+static int serial_buf_len = 0;
+static bool test_done = false;
 
 void gb_init(void) {
     gb.cycles = 0;
@@ -28,6 +31,8 @@ void gb_init(void) {
     gb.apu.sample_count = 0;
     timer_init(&gb.mmu, &gb.timer);
     serial_init(&gb.serial);
+    serial_buf_len = 0;
+    test_done = false;
 }
 
 void gb_load_boot_rom(const uint8_t *rom, uint32_t size) {
@@ -66,13 +71,33 @@ void gb_run_frame(void) {
     static int first_frames = 0;
 
     while (frame_cycles < FRAME_CYCLES) {
+        /* Detect infinite loop: JR -2 (0x18 0xFE) or HALT loop */
+        if (!test_done) {
+            uint16_t pc = gb.cpu.pc;
+            uint8_t b0 = mmu_read_byte(&gb.mmu, &gb.cart, &gb.timer, pc);
+            uint8_t b1 = mmu_read_byte(&gb.mmu, &gb.cart, &gb.timer, pc + 1);
+            if (b0 == 0x18 && b1 == 0xFE) {
+                test_done = true;
+            }
+        }
+
         int cycles = cpu_step(&gb.cpu, &gb.mmu, &gb.cart, &gb.timer);
         frame_cycles += cycles;
         gb.cycles += cycles;
         scanline_cycles += cycles;
 
         timer_tick(&gb.mmu, &gb.timer, cycles);
+
+        /* Capture serial byte before transfer overwrites SB */
+        uint8_t old_sc = gb.mmu.io[0x02];
+        uint8_t old_sb = gb.mmu.io[0x01];
         serial_tick(&gb.mmu, &gb.serial, cycles);
+        if ((old_sc & 0x80) && !(gb.mmu.io[0x02] & 0x80)) {
+            if (serial_buf_len < (int)sizeof(serial_buf) - 1) {
+                serial_buf[serial_buf_len] = (char)old_sb;
+                serial_buf_len++;
+            }
+        }
 
         if (scanline_cycles >= 456) {
             scanline_cycles -= 456;
@@ -145,4 +170,31 @@ float *gb_get_audio_samples(void) {
 
 uint32_t gb_get_audio_sample_count(void) {
     return gb.apu.sample_count;
+}
+
+CPU *gb_get_cpu(void) {
+    return &gb.cpu;
+}
+
+MMU *gb_get_mmu(void) {
+    return &gb.mmu;
+}
+
+bool gb_is_test_done(void) {
+    return test_done;
+}
+
+bool gb_check_mooneye_pass(void) {
+    return gb.cpu.b == 3 && gb.cpu.c == 5 &&
+           gb.cpu.d == 8 && gb.cpu.e == 13 &&
+           gb.cpu.h == 21 && gb.cpu.l == 34;
+}
+
+char *gb_get_serial_output(void) {
+    serial_buf[serial_buf_len] = '\0';
+    return serial_buf;
+}
+
+int gb_get_serial_output_len(void) {
+    return serial_buf_len;
 }

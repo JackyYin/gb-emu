@@ -79,6 +79,10 @@ else()
     add_executable(gameboy_unit_tests ${CORE_SOURCES} ${TEST_SOURCES})
     target_include_directories(gameboy_unit_tests PRIVATE tests)
 
+    # Mooneye test runner
+    add_executable(mooneye_runner tests/test_mooneye_runner.c ${CORE_SOURCES})
+    target_include_directories(mooneye_runner PRIVATE src/core)
+
     enable_testing()
     add_test(NAME unit_tests COMMAND gameboy_unit_tests)
 endif()
