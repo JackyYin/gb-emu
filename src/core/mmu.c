@@ -44,14 +44,9 @@ uint8_t mmu_read_byte(MMU *mmu, Cartridge *cart, Timer *timer, uint16_t addr) {
             nibble = mmu->joypad & 0x0F;
         }
         if (!(p1 & 0x20)) {     /* P15 selected: action buttons */
-            uint8_t act = 0;
-            if (mmu->joypad & 0x20) act |= 0x01;  /* A    */
-            if (mmu->joypad & 0x10) act |= 0x02;  /* B    */
-            if (mmu->joypad & 0x40) act |= 0x04;  /* Sel  */
-            if (mmu->joypad & 0x80) act |= 0x08;  /* Start*/
-            nibble = act;
+            nibble = (mmu->joypad >> 4) & 0x0F;
         }
-        return 0xC0 | (p1 & 0x30) | nibble;
+        return (p1 & 0x30) | nibble;
     }
     /*
      * IO register read masks (0xFF00-0xFF7F):
@@ -148,7 +143,6 @@ void mbc1_write_byte(Cartridge *cart, uint16_t addr, uint8_t value) {
         cart->ram_bank = value & 0x03;
     } else if (addr < 0x8000) {
         cart->bank_mode = value & 0x01;
-        printf("Banking mode selected: %d\n", cart->bank_mode);
     }
 }
 
@@ -188,8 +182,14 @@ void mmu_write_byte(MMU *mmu, Cartridge *cart, Timer *timer, uint16_t addr, uint
     if (addr < 0xFF00) {
         return;
     }
+    /* Joypad */
     if (addr == 0xFF00) {
-        mmu->io[0x00] |= (value & 0xC0);
+        /*
+         * bits 6-7: unused
+         * bits 4: Select buttons
+         * bits 3: Select d-pad
+         * */
+        mmu->io[0x00] = (value & 0x30);
         return;
     }
     /* Serial transfer Data */

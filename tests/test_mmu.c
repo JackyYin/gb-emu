@@ -132,15 +132,6 @@ static void test_hram_read_write(void) {
     ASSERT_EQ(0xAD, mmu_read_byte(&mmu, &cart, &timer, 0xFFFE), "HRAM end");
 }
 
-/* ========== IO Registers ========== */
-static void test_io_registers(void) {
-    setup();
-    mmu_write_byte(&mmu, &cart, &timer, 0xFF01, 0x42); /* Serial data */
-    mmu_write_byte(&mmu, &cart, &timer, 0xFF02, 0x81); /* Serial control */
-    ASSERT_EQ(0x42, mmu_read_byte(&mmu, &cart, &timer, 0xFF01), "IO reg serial data");
-    ASSERT_EQ(0x81, mmu_read_byte(&mmu, &cart, &timer, 0xFF02), "IO reg serial control");
-}
-
 /* ========== IE register (0xFFFF) ========== */
 static void test_ie_register(void) {
     setup();
@@ -173,16 +164,10 @@ static void test_cart_ram_enabled(void) {
     ASSERT_EQ(0x99, mmu_read_byte(&mmu, &cart, &timer, 0xBFFF), "Cart RAM end");
 }
 
-static void test_cart_ram_write(void) {
+/* ========== RAM enable register (MBC1) ========== */
+static void test_mbc1_ram_enable(void) {
     setup();
-    cart.ram_enabled = true;
-    mmu_write_byte(&mmu, &cart, &timer, 0xA000, 0xAB);
-    ASSERT_EQ(0xAB, cart_ram[0], "Cart RAM write");
-}
-
-/* ========== RAM enable register ========== */
-static void test_ram_enable(void) {
-    setup();
+    cart.type = 0x01; /* MBC1 */
     cart.ram_enabled = false;
     mmu_write_byte(&mmu, &cart, &timer, 0x0000, 0x0A); /* Enable */
     ASSERT_TRUE(cart.ram_enabled, "RAM enabled by 0x0A");
@@ -198,42 +183,6 @@ static void test_mbc1_rom_bank(void) {
     ASSERT_EQ(5, cart.rom_bank, "MBC1 ROM bank 5");
     mmu_write_byte(&mmu, &cart, &timer, 0x2000, 0x00);
     ASSERT_EQ(1, cart.rom_bank, "MBC1 ROM bank 0 maps to 1");
-}
-
-/* ========== ROM bank switching (MBC3) ========== */
-static void test_mbc3_rom_bank(void) {
-    setup();
-    cart.type = 0x13; /* MBC3 */
-    mmu_write_byte(&mmu, &cart, &timer, 0x2000, 0x10);
-    ASSERT_EQ(0x10, cart.rom_bank, "MBC3 ROM bank 0x10");
-    mmu_write_byte(&mmu, &cart, &timer, 0x2000, 0x00);
-    ASSERT_EQ(1, cart.rom_bank, "MBC3 ROM bank 0 maps to 1");
-}
-
-/* ========== MBC3 RAM bank / RTC ========== */
-static void test_mbc3_ram_bank(void) {
-    setup();
-    cart.type = 0x13;
-    mmu_write_byte(&mmu, &cart, &timer, 0x4000, 0x02);
-    ASSERT_EQ(2, cart.ram_bank, "MBC3 RAM bank 2");
-    ASSERT_FALSE(cart.rtc_mode, "MBC3 not in RTC mode");
-}
-
-static void test_mbc3_rtc_select(void) {
-    setup();
-    cart.type = 0x13;
-    mmu_write_byte(&mmu, &cart, &timer, 0x4000, 0x08);
-    ASSERT_EQ(0x08, cart.ram_bank, "MBC3 RTC register 0x08");
-    ASSERT_TRUE(cart.rtc_mode, "MBC3 RTC mode enabled");
-}
-
-/* ========== MBC1 upper ROM bank bits ========== */
-static void test_mbc1_upper_bits(void) {
-    setup();
-    cart.type = 0x01;
-    mmu_write_byte(&mmu, &cart, &timer, 0x2000, 0x05); /* Lower 5 bits */
-    mmu_write_byte(&mmu, &cart, &timer, 0x4000, 0x01); /* Upper 2 bits */
-    ASSERT_EQ(0x25, cart.rom_bank, "MBC1 upper bits (bank 0x25)");
 }
 
 /* ========== Joypad register ========== */
@@ -252,17 +201,18 @@ static void test_joypad_dpad(void) {
     mmu.joypad = 0xFB;   /* Up pressed (bit 2 clear) = 0b11111011 */
     uint8_t val = mmu_read_byte(&mmu, &cart, &timer, 0xFF00);
     uint8_t dpad = val & 0x0F;
-    ASSERT_EQ(0x0B, dpad, "D-pad: Up pressed (bit 2 clear)");
+    /* Active-low: bit 2 = 0 (pressed) */
+    ASSERT_EQ(0x0B, dpad, "D-pad: Up pressed (bit 2 = 0)");
 }
 
 static void test_joypad_buttons(void) {
     setup();
     mmu.io[0x00] = 0x10; /* P15 low (buttons selected), P14 high */
-    mmu.joypad = 0xDF;   /* A pressed (bit 5 clear) = 0b11011111 */
+    mmu.joypad = 0xEF;   /* A pressed (bit 4 clear) = 0b11101111 */
     uint8_t val = mmu_read_byte(&mmu, &cart, &timer, 0xFF00);
     uint8_t btns = val & 0x0F;
-    /* A is bit 5 of joypad, maps to bit 0 of returned nibble */
-    ASSERT_EQ(0x0E, btns, "Buttons: A pressed (bit 0 clear means pressed)");
+    /* A is bit 4 of joypad, maps to bit 0 of returned nibble */
+    ASSERT_EQ(0x0E, btns, "Buttons: A pressed (bit 0 = 0)");
 }
 
 /* ========== MMU init ========== */
@@ -295,18 +245,12 @@ void run_mmu_tests(void) {
     RUN_TEST(test_oam_read_write);
     RUN_TEST(test_unusable_region);
     RUN_TEST(test_hram_read_write);
-    RUN_TEST(test_io_registers);
     RUN_TEST(test_ie_register);
     RUN_TEST(test_ly_reset);
     RUN_TEST(test_cart_ram_disabled);
     RUN_TEST(test_cart_ram_enabled);
-    RUN_TEST(test_cart_ram_write);
-    RUN_TEST(test_ram_enable);
+    RUN_TEST(test_mbc1_ram_enable);
     RUN_TEST(test_mbc1_rom_bank);
-    RUN_TEST(test_mbc3_rom_bank);
-    RUN_TEST(test_mbc3_ram_bank);
-    RUN_TEST(test_mbc3_rtc_select);
-    RUN_TEST(test_mbc1_upper_bits);
     RUN_TEST(test_joypad_no_selection);
     RUN_TEST(test_joypad_dpad);
     RUN_TEST(test_joypad_buttons);

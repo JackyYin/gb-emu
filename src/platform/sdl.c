@@ -53,14 +53,14 @@ static void handle_events(Platform *platform) {
             uint8_t bit = 0xFF;
 
             switch (event.key.keysym.sym) {
-                case SDLK_z: bit = 5; break;
-                case SDLK_x: bit = 4; break;
-                case SDLK_RETURN: bit = 7; break;
-                case SDLK_BACKSPACE: bit = 6; break;
-                case SDLK_UP: bit = 2; break;
-                case SDLK_DOWN: bit = 3; break;
-                case SDLK_LEFT: bit = 1; break;
-                case SDLK_RIGHT: bit = 0; break;
+                case SDLK_RIGHT: bit = 0; break;   /* Right */
+                case SDLK_LEFT: bit = 1; break;   /* Left */
+                case SDLK_UP: bit = 2; break;      /* Up */
+                case SDLK_DOWN: bit = 3; break;   /* Down */
+                case SDLK_z: bit = 4; break;       /* A */
+                case SDLK_x: bit = 5; break;       /* B */
+                case SDLK_BACKSPACE: bit = 6; break; /* Select */
+                case SDLK_RETURN: bit = 7; break;  /* Start */
                 default: continue;
             }
 
@@ -69,10 +69,9 @@ static void handle_events(Platform *platform) {
             } else {
                 platform->joypad_state |= (1 << bit);
             }
-
-            gb_set_joypad(platform->joypad_state);
         }
     }
+    gb_set_joypad(platform->joypad_state);
 }
 
 int platform_init(Platform *platform) {
