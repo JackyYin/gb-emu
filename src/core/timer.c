@@ -1,10 +1,10 @@
 #include "gameboy.h"
 
 static const uint32_t tima_thresholds[4] = {
-    256,  /* 00: 4096 Hz  */
-    4,    /* 01: 262144 Hz */
-    16,   /* 10: 65536 Hz  */
-    64,   /* 11: 16384 Hz  */
+    1024, /* 00: 4096 Hz   = CPU/1024 */
+    16,   /* 01: 262144 Hz = CPU/16   */
+    64,   /* 10: 65536 Hz  = CPU/64   */
+    256,  /* 11: 16384 Hz  = CPU/256  */
 };
 
 void timer_tick(MMU *mmu, Timer *timer, uint32_t cycles) {
