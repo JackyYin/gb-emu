@@ -223,8 +223,15 @@ void mmu_write_byte(MMU *mmu, Cartridge *cart, Timer *timer, uint16_t addr, uint
     }
     if (addr < 0xFF80) {
         if (addr == 0xFF44) {
-            /* printf("trying to reset LY...\n"); */
             mmu->io[0x44] = 0;
+            return;
+        }
+        if (addr == 0xFF46) {
+            mmu->io[0x46] = value;
+            uint16_t src = ((uint16_t)value) << 8;
+            for (int i = 0; i < 0xA0; i++) {
+                mmu->oam[i] = mmu_read_byte(mmu, cart, timer, src + i);
+            }
             return;
         }
         if (addr == 0xFF50) {
