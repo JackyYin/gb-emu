@@ -16,6 +16,7 @@ typedef struct {
     bool ime;
     bool ime_delay;
     bool halted;
+    bool halt_bug;
 } CPU;
 
 typedef struct {

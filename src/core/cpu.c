@@ -42,7 +42,6 @@ static void pop(CPU *cpu, MMU *mmu, Cartridge *cart, Timer *timer, uint8_t *hi, 
 }
 
 int cpu_step(CPU *cpu, MMU *mmu, Cartridge *cart, Timer *timer) {
-    static int trace_count;
     uint8_t opcode;
     int cycles = 0;
 
@@ -112,9 +111,11 @@ int cpu_step(CPU *cpu, MMU *mmu, Cartridge *cart, Timer *timer) {
 
     opcode = read_byte(cpu, mmu, cart, timer);
 
-    /* if (opcode != 0x18) */
-    /*     printf("  instr %d: PC=0x%04X, opcode=0x%02X\n", trace_count, cpu->pc - 1, opcode); */
-    /* trace_count++; */
+    /* HALT bug: the byte after HALT is read twice (PC fails to increment) */
+    if (cpu->halt_bug) {
+        cpu->halt_bug = false;
+        cpu->pc--;
+    }
 
     switch (opcode) {
         case 0x00: /* NOP */
@@ -781,7 +782,13 @@ int cpu_step(CPU *cpu, MMU *mmu, Cartridge *cart, Timer *timer) {
             cycles = 8;
             break;
         case 0x76: /* HALT */
-            cpu->halted = true;
+            if (!cpu->ime && (mmu->io[0x7F] & mmu->io[0x0F] & 0x1F)) {
+                /* HALT bug: IME=0 with pending interrupt — don't halt,
+                   and the next opcode byte will be read twice */
+                cpu->halt_bug = true;
+            } else {
+                cpu->halted = true;
+            }
             cycles = 4;
             break;
         case 0x77: /* LD (HL), A */
@@ -1804,4 +1811,5 @@ void cpu_init(CPU *cpu) {
     cpu->ime = false;
     cpu->ime_delay = false;
     cpu->halted = false;
+    cpu->halt_bug = false;
 }
