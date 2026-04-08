@@ -82,8 +82,10 @@ void ppu_render_scanline(MMU *mmu, uint8_t line) {
             uint8_t bit2 = (byte2 >> bit_x) & 1;
             color_idx = (bit2 << 1) | bit1;
         } else {
-            uint8_t tile_x = (x + scx) / 8;
-            uint8_t tile_y = (line + scy) / 8;
+            uint8_t wrapped_x = (uint8_t)(x + scx);
+            uint8_t wrapped_y = (uint8_t)(line + scy);
+            uint8_t tile_x = wrapped_x / 8;
+            uint8_t tile_y = wrapped_y / 8;
             uint16_t tile_addr = bg_tile_map + tile_y * 32 + tile_x;
             uint8_t tile_num = read_vram(mmu, tile_addr);
             uint16_t tile_data_addr;
@@ -92,8 +94,8 @@ void ppu_render_scanline(MMU *mmu, uint8_t line) {
             } else {
                 tile_data_addr = 0x9000 + (int8_t)tile_num * 16;
             }
-            uint8_t line_in_tile = (line + scy) % 8;
-            uint8_t bit_x = 7 - ((x + scx) % 8);
+            uint8_t line_in_tile = wrapped_y % 8;
+            uint8_t bit_x = 7 - (wrapped_x % 8);
             uint8_t byte1 = read_vram(mmu, tile_data_addr + line_in_tile * 2);
             uint8_t byte2 = read_vram(mmu, tile_data_addr + line_in_tile * 2 + 1);
             uint8_t bit1 = (byte1 >> bit_x) & 1;
