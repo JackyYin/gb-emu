@@ -7,13 +7,12 @@ uint8_t mmu_read_byte(MMU *mmu, Cartridge *cart, Timer *timer, uint16_t addr) {
             return cart->boot_rom[addr];
         }
         if (addr < 0x4000) {
-            return cart->rom ? cart->rom[addr] : 0;
-        } else {
-            uint32_t rom_addr = (uint32_t)cart->rom_bank * 0x4000 + (addr - 0x4000);
-            if (rom_addr < cart->rom_size) {
-                return cart->rom[rom_addr];
-            }
-            return 0;
+            uint32_t rom_addr = (uint32_t)(cart->bank_mode ? (cart->ram_bank << 5) : 0) * 0x4000 + addr;
+            return cart->rom[rom_addr];
+        }
+        else {
+            uint32_t rom_addr = (uint32_t)((cart->ram_bank << 5) | cart->rom_bank) * 0x4000 + (addr - 0x4000);
+            return cart->rom[rom_addr];
         }
     }
     if (addr < 0xA000) {
@@ -21,10 +20,8 @@ uint8_t mmu_read_byte(MMU *mmu, Cartridge *cart, Timer *timer, uint16_t addr) {
     }
     if (addr < 0xC000) {
         if (cart->ram_enabled && cart->ram) {
-            uint32_t ram_addr = (uint32_t)cart->ram_bank * 0x2000 + (addr - 0xA000);
-            if (ram_addr < cart->ram_size) {
-                return cart->ram[ram_addr];
-            }
+            uint32_t ram_addr = (uint32_t)(cart->bank_mode ? (cart->ram_bank * 0x2000) : 0) + (addr - 0xA000);
+            return cart->ram[ram_addr];
         }
         return 0xFF;
     }
@@ -136,37 +133,30 @@ uint8_t mmu_read_byte(MMU *mmu, Cartridge *cart, Timer *timer, uint16_t addr) {
     return mmu->io[0x7F];  /* IE register */
 }
 
+
+void mbc1_write_byte(Cartridge *cart, uint16_t addr, uint8_t value) {
+    if (addr < 0x2000) {
+        cart->ram_enabled = (value & 0x0F) == 0x0A;
+    } else if (addr < 0x4000) {
+        uint8_t bank = value & 0x1F;
+        if (bank == 0) bank = 1;
+        cart->rom_bank = bank;
+    } else if (addr < 0x6000) {
+        /*
+         * Use 2 bits to select RAM Bank
+         * */
+        cart->ram_bank = value & 0x03;
+    } else if (addr < 0x8000) {
+        cart->bank_mode = value & 0x01;
+        printf("Banking mode selected: %d\n", cart->bank_mode);
+    }
+}
+
 void mmu_write_byte(MMU *mmu, Cartridge *cart, Timer *timer, uint16_t addr, uint8_t value) {
     if (addr < 0x8000) {
-        if (addr < 0x2000) {
-            cart->ram_enabled = (value & 0x0F) == 0x0A;
-        } else if (addr < 0x4000) {
-            if (cart->type == 0x13) {
-                uint8_t bank = value & 0x7F;
-                if (bank == 0) bank = 1;
-                cart->rom_bank = bank;
-            } else {
-                uint8_t bank = value & 0x1F;
-                if (bank == 0) bank = 1;
-                cart->rom_bank = bank;
-            }
-        } else if (addr < 0x6000) {
-            if (cart->type == 0x13) {
-                if (value <= 0x03) {
-                    cart->ram_bank = value;
-                    cart->rtc_mode = false;
-                } else if (value >= 0x08 && value <= 0x0C) {
-                    cart->ram_bank = value;
-                    cart->rtc_mode = true;
-                }
-            } else {
-                cart->rom_bank = (cart->rom_bank & 0x1F) | ((value & 0x03) << 5);
-                if (cart->rom_bank == 0) cart->rom_bank = 1;
-            }
-        } else if (addr < 0x8000) {
-            if (cart->type == 0x13 && value == 0x01) {
-                /* RTC latch - ignore for now */
-            }
+        // MBC 1
+        if (cart->type >= 0x01 && cart->type <= 0x03) {
+            mbc1_write_byte(cart, addr, value);
         }
         return;
     }
@@ -176,7 +166,7 @@ void mmu_write_byte(MMU *mmu, Cartridge *cart, Timer *timer, uint16_t addr, uint
     }
     if (addr < 0xC000) {
         if (cart->ram_enabled && cart->ram) {
-            uint32_t ram_addr = (uint32_t)cart->ram_bank * 0x2000 + (addr - 0xA000);
+            uint32_t ram_addr = (uint32_t)(cart->bank_mode ? (cart->ram_bank * 0x2000):0) + (addr - 0xA000);
             if (ram_addr < cart->ram_size) {
                 cart->ram[ram_addr] = value;
             }

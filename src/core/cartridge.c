@@ -8,6 +8,7 @@ void cart_init(Cartridge *cart) {
     cart->rom_bank = 1;
     cart->ram_bank = 0;
     cart->ram_enabled = false;
+    cart->bank_mode = 0;
 }
 
 uint8_t cart_read_rom(Cartridge *cart, uint16_t addr) {

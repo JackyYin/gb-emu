@@ -1,5 +1,6 @@
 #include "gameboy.h"
 #include <stdio.h>
+#include <stdlib.h>
 
 static GameBoy gb;
 static int frame_count = 0;
@@ -47,7 +48,7 @@ void gb_load_rom(const uint8_t *rom, uint32_t size) {
     gb.cart.rom_size = size;
     gb.cart.rom = rom;
     gb.cart.type = rom[0x147];
-
+    uint8_t rom_size_byte = rom[0x148];
     uint8_t ram_size_byte = rom[0x149];
     switch (ram_size_byte) {
         case 0x02: gb.cart.ram_size = 8 * 1024; break;
@@ -55,6 +56,11 @@ void gb_load_rom(const uint8_t *rom, uint32_t size) {
         case 0x04: gb.cart.ram_size = 128 * 1024; break;
         case 0x05: gb.cart.ram_size = 64 * 1024; break;
         default:   gb.cart.ram_size = 0; break;
+    }
+    printf("cart type: 0x%x, rom size: 0x%x ram size: 0x%x\n", rom[0x147], rom[0x148], rom[0x149]);
+
+    if (gb.cart.ram_size > 0) {
+        gb.cart.ram = malloc(gb.cart.ram_size);
     }
 
     gb.cart.rtc_mode = false;

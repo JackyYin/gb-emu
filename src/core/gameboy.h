@@ -38,9 +38,10 @@ typedef struct {
     uint32_t rom_size;
     uint8_t *ram;
     uint32_t ram_size;
+    bool ram_enabled;
     uint8_t rom_bank;
     uint8_t ram_bank;
-    bool ram_enabled;
+    uint8_t bank_mode;
     uint8_t type;
     bool rtc_mode;
     const uint8_t *boot_rom;
