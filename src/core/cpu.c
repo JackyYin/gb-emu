@@ -1120,7 +1120,7 @@ int cpu_step(CPU *cpu, MMU *mmu, Cartridge *cart, Timer *timer) {
             {
                 uint8_t c = (cpu->f & FLAG_C) ? 1 : 0;
                 uint8_t res = cpu->a - cpu->a - c;
-                cpu->f = FLAG_N | (res ? 0 : FLAG_Z) | (c ? FLAG_C : 0) | ((0x0F < c) ? FLAG_H : 0);
+                cpu->f = FLAG_N | (res==0 ? FLAG_Z : 0) | (c ? FLAG_C : 0) | (c ? FLAG_H : 0);
                 cpu->a = res;
             }
             cycles = 4;
