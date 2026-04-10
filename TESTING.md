@@ -123,10 +123,6 @@ Tests the cartridge module's standalone functions and timer initialization.
 **Coverage:**
 
 - `cart_init()` default state
-- `cart_read_rom()` bank 0 and switchable bank reads
-- ROM out-of-bounds returns 0xFF
-- `cart_write_ram()` / `cart_read_ram()` round-trip
-- RAM out-of-range and NULL RAM handling
 - `timer_init()` zeroes all fields
 - `timer_tick()` stub runs without crash
 

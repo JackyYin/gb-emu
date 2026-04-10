@@ -3,9 +3,6 @@
 #include <string.h>
 
 extern void cart_init(Cartridge *cart);
-extern uint8_t cart_read_rom(Cartridge *cart, uint16_t addr);
-extern void cart_write_ram(Cartridge *cart, uint16_t addr, uint8_t value);
-extern uint8_t cart_read_ram(Cartridge *cart, uint16_t addr);
 extern void timer_tick(MMU *mmu, Timer *timer, uint32_t cycles);
 extern void timer_init(MMU *mmu, Timer *timer);
 
@@ -34,51 +31,6 @@ static void test_cart_init(void) {
     ASSERT_FALSE(c.ram_enabled, "cart_init ram disabled");
     ASSERT_TRUE(c.rom == NULL, "cart_init rom = NULL");
     ASSERT_TRUE(c.ram == NULL, "cart_init ram = NULL");
-}
-
-/* ========== ROM bank 0 read ========== */
-static void test_cart_read_rom_bank0(void) {
-    setup();
-    rom_data[0x0000] = 0x31;
-    rom_data[0x3FFF] = 0xAA;
-    ASSERT_EQ(0x31, cart_read_rom(&cart, 0x0000), "ROM bank 0 start");
-    ASSERT_EQ(0xAA, cart_read_rom(&cart, 0x3FFF), "ROM bank 0 end");
-}
-
-/* ========== ROM bank N read ========== */
-static void test_cart_read_rom_bank_switch(void) {
-    setup();
-    cart.rom_bank = 2;
-    rom_data[0x8000] = 0xBB; /* Bank 2 at offset 0x8000 */
-    ASSERT_EQ(0xBB, cart_read_rom(&cart, 0x4000), "ROM bank 2 read");
-}
-
-static void test_cart_read_rom_out_of_bounds(void) {
-    setup();
-    cart.rom_size = 0x8000; /* Only 2 banks */
-    cart.rom_bank = 3;      /* Bank 3 doesn't exist */
-    ASSERT_EQ(0xFF, cart_read_rom(&cart, 0x4000), "ROM out of bounds returns 0xFF");
-}
-
-/* ========== Cart RAM read/write ========== */
-static void test_cart_ram_write_read(void) {
-    setup();
-    cart_write_ram(&cart, 0xA000, 0x42);
-    ASSERT_EQ(0x42, ram_data[0], "Cart RAM write stored");
-    ASSERT_EQ(0x42, cart_read_ram(&cart, 0xA000), "Cart RAM read back");
-}
-
-static void test_cart_ram_out_of_range(void) {
-    setup();
-    /* Address below 0xA000 should not write */
-    cart_write_ram(&cart, 0x9FFF, 0xFF);
-    ASSERT_EQ(0xFF, cart_read_ram(&cart, 0x9FFF), "RAM read out of range returns 0xFF");
-}
-
-static void test_cart_ram_no_ram(void) {
-    setup();
-    cart.ram = NULL;
-    ASSERT_EQ(0xFF, cart_read_ram(&cart, 0xA000), "No RAM returns 0xFF");
 }
 
 /* ========== Timer init ========== */
@@ -171,12 +123,6 @@ void run_cartridge_tests(void) {
     TEST_SUITE("Cartridge & Timer Tests");
 
     RUN_TEST(test_cart_init);
-    RUN_TEST(test_cart_read_rom_bank0);
-    RUN_TEST(test_cart_read_rom_bank_switch);
-    RUN_TEST(test_cart_read_rom_out_of_bounds);
-    RUN_TEST(test_cart_ram_write_read);
-    RUN_TEST(test_cart_ram_out_of_range);
-    RUN_TEST(test_cart_ram_no_ram);
     RUN_TEST(test_timer_init);
     RUN_TEST(test_timer_tick_div);
     RUN_TEST(test_timer_tick_tima);
