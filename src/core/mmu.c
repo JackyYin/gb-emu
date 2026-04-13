@@ -80,12 +80,18 @@ uint8_t mmu_read_byte(MMU *mmu, Cartridge *cart, Timer *timer, uint16_t addr) {
         if (addr < 0x100 && cart->boot_rom_enabled && cart->boot_rom) {
             return cart->boot_rom[addr];
         }
+         // 0x0000–0x3FFF (fixed bank)
         if (addr < 0x4000) {
-            uint32_t rom_addr = (uint32_t)(cart->bank_mode ? (cart->ram_bank << 5) : 0) * 0x4000 + addr;
+            uint8_t bank_mask = (1 << (cart->rom_nr_bits + 1)) - 1;
+            uint8_t bank = (cart->bank_mode ? (cart->ram_bank << 5) : 0) & bank_mask;
+            uint32_t rom_addr = (uint32_t)bank * 0x4000 + addr;
             return cart->rom[rom_addr];
         }
+        // 0x4000–0x7FFF (switchable bank)
         else {
-            uint32_t rom_addr = (uint32_t)((cart->ram_bank << 5) | cart->rom_bank) * 0x4000 + (addr - 0x4000);
+            uint8_t bank_mask = (1 << (cart->rom_nr_bits + 1)) - 1;
+            uint8_t bank = ((cart->ram_bank << 5) | cart->rom_bank) & bank_mask;
+            uint32_t rom_addr = (uint32_t)bank * 0x4000 + (addr - 0x4000);
             return cart->rom[rom_addr];
         }
     }
@@ -121,7 +127,7 @@ uint8_t mmu_read_byte(MMU *mmu, Cartridge *cart, Timer *timer, uint16_t addr) {
         if (!(p1 & 0x20)) {     /* P15 selected: action buttons */
             nibble = (mmu->joypad >> 4) & 0x0F;
         }
-        return (p1 & 0x30) | nibble;
+        return 0xC0 | (p1 & 0x30) | nibble;
     }
     if (addr < 0xFF80) {
         return io_reg_read_byte(mmu, addr);

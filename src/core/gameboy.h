@@ -34,19 +34,20 @@ typedef struct {
 } MMU;
 
 typedef struct {
-    const uint8_t *rom;
-    uint32_t rom_size;
-    uint8_t *ram;
-    uint32_t ram_size;
+    bool boot_rom_enabled;
     bool ram_enabled;
+    bool rtc_mode;
+    const uint8_t *rom;
+    uint8_t *ram;
+    uint8_t type;
     uint8_t rom_bank;
     uint8_t ram_bank;
     uint8_t bank_mode;
-    uint8_t type;
-    bool rtc_mode;
+    uint8_t rom_nr_bits;
     const uint8_t *boot_rom;
     uint32_t boot_rom_size;
-    bool boot_rom_enabled;
+    uint32_t rom_size;
+    uint32_t ram_size;
 } Cartridge;
 
 typedef struct {
