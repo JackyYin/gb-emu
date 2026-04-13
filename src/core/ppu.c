@@ -1,6 +1,11 @@
 #include "gameboy.h"
 #include <stdlib.h>
 
+// https://gbdev.io/pandocs/Tile_Data.html
+#define TILE_WIDTH  (8)
+#define TILE_HEIGHT (8)
+#define TILE_SIZE   (16)
+
 // https://gbdev.io/pandocs/OAM.html
 #define OAM_COUNT 40
 #define MAX_SPRITES_PER_LINE 10
@@ -34,6 +39,12 @@ static uint8_t read_oam(MMU *mmu, uint16_t addr) {
     return mmu->oam[addr - 0xFE00];
 }
 
+static uint8_t get_tile_pixel(uint8_t lsb_byte, uint8_t msb_byte, int x) {
+    uint8_t bit1 = (lsb_byte >> (7 - x)) & 1;
+    uint8_t bit2 = (msb_byte >> (7 - x)) & 1;
+    return (bit1 | (bit2 << 1));
+}
+
 static int compare_sprites(const void *a, const void *b) {
     const Sprite *sa = (const Sprite *)a;
     const Sprite *sb = (const Sprite *)b;
@@ -63,7 +74,6 @@ void ppu_render_scanline(MMU *mmu, uint8_t line) {
 
     if (!lcd_enabled) return;
 
-    uint8_t bg_colors[SCREEN_W];
     uint8_t bg_priority[SCREEN_W];
 
     for (int x = 0; x < SCREEN_W; x++) {
@@ -75,46 +85,39 @@ void ppu_render_scanline(MMU *mmu, uint8_t line) {
         else if (window_enabled && line >= wy && x >= wx - 1) {
             int win_x = x - (wx - 1);
             int win_y = line - wy;
-            uint8_t tile_x = win_x / 8;
-            uint8_t tile_y = win_y / 8;
-            uint16_t tile_addr = win_tile_map + tile_y * 32 + tile_x;
+            uint8_t tile_x = win_x / TILE_WIDTH;
+            uint8_t tile_y = win_y / TILE_HEIGHT;
+            uint16_t tile_addr = win_tile_map + tile_y * (256 / TILE_WIDTH) + tile_x;
             uint8_t tile_num = read_vram(mmu, tile_addr);
             uint16_t tile_data_addr;
             if (use_unsigned) {
-                tile_data_addr = 0x8000 + tile_num * 16;
+                tile_data_addr = 0x8000 + tile_num * TILE_SIZE;
             } else {
-                tile_data_addr = 0x9000 + (int8_t)tile_num * 16;
+                tile_data_addr = 0x9000 + (int8_t)tile_num * TILE_SIZE;
             }
-            uint8_t line_in_tile = win_y % 8;
-            uint8_t bit_x = 7 - (win_x % 8);
+            uint8_t line_in_tile = win_y % TILE_HEIGHT;
             uint8_t byte1 = read_vram(mmu, tile_data_addr + line_in_tile * 2);
             uint8_t byte2 = read_vram(mmu, tile_data_addr + line_in_tile * 2 + 1);
-            uint8_t bit1 = (byte1 >> bit_x) & 1;
-            uint8_t bit2 = (byte2 >> bit_x) & 1;
-            color_idx = (bit2 << 1) | bit1;
+            color_idx = get_tile_pixel(byte1, byte2,  win_x % TILE_WIDTH);
         } else {
             uint8_t wrapped_x = (uint8_t)(x + scx);
             uint8_t wrapped_y = (uint8_t)(line + scy);
-            uint8_t tile_x = wrapped_x / 8;
-            uint8_t tile_y = wrapped_y / 8;
-            uint16_t tile_addr = bg_tile_map + tile_y * 32 + tile_x;
+            uint8_t tile_x = wrapped_x / TILE_WIDTH;
+            uint8_t tile_y = wrapped_y / TILE_HEIGHT;
+            uint16_t tile_addr = bg_tile_map + tile_y * (256 / TILE_WIDTH) + tile_x;
             uint8_t tile_num = read_vram(mmu, tile_addr);
             uint16_t tile_data_addr;
             if (use_unsigned) {
-                tile_data_addr = 0x8000 + tile_num * 16;
+                tile_data_addr = 0x8000 + tile_num * TILE_SIZE;
             } else {
-                tile_data_addr = 0x9000 + (int8_t)tile_num * 16;
+                tile_data_addr = 0x9000 + (int8_t)tile_num * TILE_SIZE;
             }
-            uint8_t line_in_tile = wrapped_y % 8;
-            uint8_t bit_x = 7 - (wrapped_x % 8);
+            uint8_t line_in_tile = wrapped_y % TILE_HEIGHT;
             uint8_t byte1 = read_vram(mmu, tile_data_addr + line_in_tile * 2);
             uint8_t byte2 = read_vram(mmu, tile_data_addr + line_in_tile * 2 + 1);
-            uint8_t bit1 = (byte1 >> bit_x) & 1;
-            uint8_t bit2 = (byte2 >> bit_x) & 1;
-            color_idx = (bit2 << 1) | bit1;
+            color_idx = get_tile_pixel(byte1, byte2, wrapped_x % TILE_WIDTH);
         }
 
-        bg_colors[x] = color_idx;
         bg_priority[x] = color_idx;
 
         uint8_t pal_idx = (bgp >> (color_idx * 2)) & 0x03;
@@ -122,6 +125,9 @@ void ppu_render_scanline(MMU *mmu, uint8_t line) {
     }
 
     if (!obj_enabled) return;
+
+    int sprite_w = 8;
+    int sprite_h = use_8x16 ? 16 : 8;
 
     Sprite sprites[MAX_SPRITES_PER_LINE];
     int sprite_count = 0;
@@ -133,7 +139,6 @@ void ppu_render_scanline(MMU *mmu, uint8_t line) {
 
         if (sprite_x == 0 || sprite_x >= 168) continue;
 
-        int sprite_h = use_8x16 ? 16 : 8;
         int actual_y = (int)OAM_SPRITE_Y_TO_ACTUAL_Y(sprite_y);
         int actual_x = (int)OAM_SPRITE_X_TO_ACTUAL_X(sprite_x);
 
@@ -153,24 +158,25 @@ void ppu_render_scanline(MMU *mmu, uint8_t line) {
 
     for (int x = SCREEN_W - 1; x >= 0; x--) {
         for (int s = 0; s < sprite_count; s++) {
-            int sprite_h = use_8x16 ? 16 : 8;
             int actual_y = (int)OAM_SPRITE_Y_TO_ACTUAL_Y(sprites[s].y);
             int actual_x = (int)OAM_SPRITE_X_TO_ACTUAL_X(sprites[s].x);
 
-            if (x < actual_x || x >= actual_x + 8) continue;
+            if (x < actual_x || x >= actual_x + sprite_w) continue;
 
             uint8_t tile_num = sprites[s].tile;
             uint8_t flags = sprites[s].flags;
             bool x_flip = flags & 0x20;
             bool y_flip = flags & 0x40;
-            bool priority = flags & 0x80;
+            bool priority = flags & 0x80; // 0 = No, 1 = BG and Window color indices 1–3 are drawn over this OBJ
             uint8_t pal = (flags & 0x10) ? obp1 : obp0;
+
+            if (priority && bg_priority[x] != 0) continue;
 
             if (use_8x16) {
                 tile_num &= 0xFE;
             }
 
-            uint16_t tile_data_addr = 0x8000 + tile_num * 16;
+            uint16_t tile_data_addr = 0x8000 + tile_num * TILE_SIZE;
 
             int pixel_x = x - actual_x;
             int pixel_y = line - actual_y;
@@ -180,14 +186,9 @@ void ppu_render_scanline(MMU *mmu, uint8_t line) {
 
             uint8_t byte1 = read_vram(mmu, tile_data_addr + pixel_y * 2);
             uint8_t byte2 = read_vram(mmu, tile_data_addr + pixel_y * 2 + 1);
-
-            uint8_t bit1 = (byte1 >> (7 - pixel_x)) & 1;
-            uint8_t bit2 = (byte2 >> (7 - pixel_x)) & 1;
-            uint8_t color_idx = (bit2 << 1) | bit1;
+            uint8_t color_idx = get_tile_pixel(byte1, byte2, pixel_x);
 
             if (color_idx == 0) continue;
-
-            if (priority && bg_priority[x] != 0) continue;
 
             uint8_t pal_idx = (pal >> (color_idx * 2)) & 0x03;
             mmu->framebuffer[line * SCREEN_W + x] = gb_colors[pal_idx];
