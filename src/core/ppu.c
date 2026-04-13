@@ -6,6 +6,10 @@
 #define TILE_HEIGHT (8)
 #define TILE_SIZE   (16)
 
+// https://gbdev.io/pandocs/Scrolling.html?highlight=WX#ff4aff4b--wy-wx-window-y-position-x-position-plus-7
+#define WX_TO_ACTUAL_X(x) \
+    ((uint8_t)(wx) - 7)
+
 // https://gbdev.io/pandocs/OAM.html
 #define OAM_COUNT 40
 #define MAX_SPRITES_PER_LINE 10
@@ -71,7 +75,6 @@ void ppu_render_scanline(MMU *mmu, uint8_t line) {
     bool obj_enabled = lcdc & 0x02;                          // bit 1 = OBJ Enable
     bool bg_enabled = lcdc & 0x01;                           // bit 0 = BG and Window Enable
 
-
     if (!lcd_enabled) return;
 
     uint8_t bg_priority[SCREEN_W];
@@ -82,8 +85,8 @@ void ppu_render_scanline(MMU *mmu, uint8_t line) {
         if (!bg_enabled) {
             color_idx = 0;
         }
-        else if (window_enabled && line >= wy && x >= wx - 1) {
-            int win_x = x - (wx - 1);
+        else if (window_enabled && line >= wy && x >= WX_TO_ACTUAL_X(wx)) {
+            int win_x = x - WX_TO_ACTUAL_X(wx);
             int win_y = line - wy;
             uint8_t tile_x = win_x / TILE_WIDTH;
             uint8_t tile_y = win_y / TILE_HEIGHT;
