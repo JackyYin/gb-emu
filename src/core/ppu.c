@@ -1,8 +1,15 @@
 #include "gameboy.h"
 #include <stdlib.h>
 
+// https://gbdev.io/pandocs/OAM.html
 #define OAM_COUNT 40
 #define MAX_SPRITES_PER_LINE 10
+
+#define OAM_SPRITE_X_TO_ACTUAL_X(x) \
+    ((int)(x) - 8)
+
+#define OAM_SPRITE_Y_TO_ACTUAL_Y(y) \
+    ((int)(y) - 16)
 
 typedef struct {
     uint8_t y;
@@ -51,6 +58,7 @@ void ppu_render_scanline(MMU *mmu, uint8_t line) {
     uint16_t bg_tile_map = (lcdc & 0x08) ? 0x9C00 : 0x9800;  // bit 3 = BG tile map (0=0x9800, 1=0x9C00)
     bool use_8x16    = lcdc & 0x04;                          // bit 2 = OBJ size (0=8x8, 1=8x16)
     bool obj_enabled = lcdc & 0x02;                          // bit 1 = OBJ Enable
+    bool bg_enabled = lcdc & 0x01;                           // bit 0 = BG and Window Enable
 
 
     if (!lcd_enabled) return;
@@ -61,7 +69,10 @@ void ppu_render_scanline(MMU *mmu, uint8_t line) {
     for (int x = 0; x < SCREEN_W; x++) {
         uint8_t color_idx;
 
-        if (window_enabled && line >= wy && x >= wx - 1) {
+        if (!bg_enabled) {
+            color_idx = 0;
+        }
+        else if (window_enabled && line >= wy && x >= wx - 1) {
             int win_x = x - (wx - 1);
             int win_y = line - wy;
             uint8_t tile_x = win_x / 8;
@@ -123,8 +134,8 @@ void ppu_render_scanline(MMU *mmu, uint8_t line) {
         if (sprite_x == 0 || sprite_x >= 168) continue;
 
         int sprite_h = use_8x16 ? 16 : 8;
-        int actual_y = (int)sprite_y - 8;
-        int actual_x = (int)sprite_x - 8;
+        int actual_y = (int)OAM_SPRITE_Y_TO_ACTUAL_Y(sprite_y);
+        int actual_x = (int)OAM_SPRITE_X_TO_ACTUAL_X(sprite_x);
 
         if (line >= actual_y && line < actual_y + sprite_h) {
             sprites[sprite_count].y = sprite_y;
@@ -143,8 +154,8 @@ void ppu_render_scanline(MMU *mmu, uint8_t line) {
     for (int x = SCREEN_W - 1; x >= 0; x--) {
         for (int s = 0; s < sprite_count; s++) {
             int sprite_h = use_8x16 ? 16 : 8;
-            int actual_x = (int)sprites[s].x - 8;
-            int actual_y = (int)sprites[s].y - 8;
+            int actual_y = (int)OAM_SPRITE_Y_TO_ACTUAL_Y(sprites[s].y);
+            int actual_x = (int)OAM_SPRITE_X_TO_ACTUAL_X(sprites[s].x);
 
             if (x < actual_x || x >= actual_x + 8) continue;
 
