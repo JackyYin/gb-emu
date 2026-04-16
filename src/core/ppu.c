@@ -2,9 +2,9 @@
 #include <stdlib.h>
 
 // https://gbdev.io/pandocs/Tile_Data.html
-#define TILE_WIDTH  (8)
-#define TILE_HEIGHT (8)
-#define TILE_SIZE   (16)
+#define TILE_SHIFT          (3) // 1 << 3 = 8 pixels
+#define TILE_SIZE_SHIFT     (4) // 1 << 4 = 16 bytes
+#define TILES_PER_ROW_SHIFT (5) // 256 pixels / 8 pixels = 32
 
 // https://gbdev.io/pandocs/Scrolling.html?highlight=WX#ff4aff4b--wy-wx-window-y-position-x-position-plus-7
 #define WX_TO_ACTUAL_X(x) \
@@ -49,6 +49,30 @@ static uint8_t get_tile_pixel(uint8_t lsb_byte, uint8_t msb_byte, int x) {
     return (bit1 | (bit2 << 1));
 }
 
+static uint8_t get_color_idx_by_x_y(MMU *mmu, uint16_t tile_data_addr, uint8_t x, uint8_t y) {
+    uint8_t line_in_tile = y & ((1 << TILE_SHIFT)-1);
+    uint8_t byte1 = read_vram(mmu, tile_data_addr + line_in_tile * 2);
+    uint8_t byte2 = read_vram(mmu, tile_data_addr + line_in_tile * 2 + 1);
+    return get_tile_pixel(byte1, byte2,  x & ((1 << TILE_SHIFT) -1));
+}
+
+static uint16_t get_tile_data_addr_by_idx(bool use_unsigned, uint8_t tile_idx) {
+    uint16_t tile_data_addr;
+    if (use_unsigned) {
+        tile_data_addr = 0x8000 + (tile_idx << TILE_SIZE_SHIFT);
+    } else {
+        tile_data_addr = 0x9000 + ((int8_t)tile_idx << TILE_SIZE_SHIFT);
+    }
+    return tile_data_addr;
+}
+
+static uint8_t get_tile_idx_by_x_y(MMU *mmu, uint16_t tile_map_addr, uint8_t x, uint8_t y) {
+    uint8_t tile_x = x >> TILE_SHIFT;
+    uint8_t tile_y = y >> TILE_SHIFT;
+    uint16_t tile_addr = tile_map_addr + (tile_y << TILES_PER_ROW_SHIFT) + tile_x;
+    return read_vram(mmu, tile_addr);
+}
+
 static int compare_sprites(const void *a, const void *b) {
     const Sprite *sa = (const Sprite *)a;
     const Sprite *sb = (const Sprite *)b;
@@ -86,39 +110,17 @@ void ppu_render_scanline(MMU *mmu, uint8_t line) {
             color_idx = 0;
         }
         else if (window_enabled && line >= wy && x >= WX_TO_ACTUAL_X(wx)) {
-            int win_x = x - WX_TO_ACTUAL_X(wx);
-            int win_y = line - wy;
-            uint8_t tile_x = win_x / TILE_WIDTH;
-            uint8_t tile_y = win_y / TILE_HEIGHT;
-            uint16_t tile_addr = win_tile_map + tile_y * (256 / TILE_WIDTH) + tile_x;
-            uint8_t tile_num = read_vram(mmu, tile_addr);
-            uint16_t tile_data_addr;
-            if (use_unsigned) {
-                tile_data_addr = 0x8000 + tile_num * TILE_SIZE;
-            } else {
-                tile_data_addr = 0x9000 + (int8_t)tile_num * TILE_SIZE;
-            }
-            uint8_t line_in_tile = win_y % TILE_HEIGHT;
-            uint8_t byte1 = read_vram(mmu, tile_data_addr + line_in_tile * 2);
-            uint8_t byte2 = read_vram(mmu, tile_data_addr + line_in_tile * 2 + 1);
-            color_idx = get_tile_pixel(byte1, byte2,  win_x % TILE_WIDTH);
+            uint8_t win_x = x - WX_TO_ACTUAL_X(wx);
+            uint8_t win_y = line - wy;
+            uint8_t tile_idx = get_tile_idx_by_x_y(mmu, win_tile_map, win_x, win_y);
+            uint16_t tile_data_addr = get_tile_data_addr_by_idx(use_unsigned, tile_idx);
+            color_idx = get_color_idx_by_x_y(mmu, tile_data_addr, win_x, win_y);
         } else {
             uint8_t wrapped_x = (uint8_t)(x + scx);
             uint8_t wrapped_y = (uint8_t)(line + scy);
-            uint8_t tile_x = wrapped_x / TILE_WIDTH;
-            uint8_t tile_y = wrapped_y / TILE_HEIGHT;
-            uint16_t tile_addr = bg_tile_map + tile_y * (256 / TILE_WIDTH) + tile_x;
-            uint8_t tile_num = read_vram(mmu, tile_addr);
-            uint16_t tile_data_addr;
-            if (use_unsigned) {
-                tile_data_addr = 0x8000 + tile_num * TILE_SIZE;
-            } else {
-                tile_data_addr = 0x9000 + (int8_t)tile_num * TILE_SIZE;
-            }
-            uint8_t line_in_tile = wrapped_y % TILE_HEIGHT;
-            uint8_t byte1 = read_vram(mmu, tile_data_addr + line_in_tile * 2);
-            uint8_t byte2 = read_vram(mmu, tile_data_addr + line_in_tile * 2 + 1);
-            color_idx = get_tile_pixel(byte1, byte2, wrapped_x % TILE_WIDTH);
+            uint8_t tile_idx = get_tile_idx_by_x_y(mmu, bg_tile_map, wrapped_x, wrapped_y);
+            uint16_t tile_data_addr = get_tile_data_addr_by_idx(use_unsigned, tile_idx);
+            color_idx = get_color_idx_by_x_y(mmu, tile_data_addr, wrapped_x, wrapped_y);
         }
 
         bg_priority[x] = color_idx;
@@ -179,14 +181,13 @@ void ppu_render_scanline(MMU *mmu, uint8_t line) {
                 tile_num &= 0xFE;
             }
 
-            uint16_t tile_data_addr = 0x8000 + tile_num * TILE_SIZE;
-
-            int pixel_x = x - actual_x;
-            int pixel_y = line - actual_y;
+            uint8_t pixel_x = x - actual_x;
+            uint8_t pixel_y = line - actual_y;
 
             if (x_flip) pixel_x = 7 - pixel_x;
             if (y_flip) pixel_y = sprite_h - 1 - pixel_y;
 
+            uint16_t tile_data_addr = 0x8000 + (tile_num << TILE_SIZE_SHIFT);
             uint8_t byte1 = read_vram(mmu, tile_data_addr + pixel_y * 2);
             uint8_t byte2 = read_vram(mmu, tile_data_addr + pixel_y * 2 + 1);
             uint8_t color_idx = get_tile_pixel(byte1, byte2, pixel_x);
