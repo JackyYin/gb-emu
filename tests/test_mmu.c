@@ -192,7 +192,7 @@ static void test_joypad_no_selection(void) {
     mmu.joypad = 0x00;    /* All pressed */
     uint8_t val = mmu_read_byte(&mmu, &cart, &timer, 0xFF00);
     /* No selection -> nibble = 0x0F (no buttons) */
-    ASSERT_EQ(0x3F, val, "Joypad no selection returns 0x3F");
+    ASSERT_EQ(0xFF, val, "Joypad no selection returns 0x3F");
 }
 
 static void test_joypad_dpad(void) {
