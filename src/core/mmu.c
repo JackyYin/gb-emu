@@ -110,7 +110,8 @@ uint8_t mmu_read_byte(MMU *mmu, Cartridge *cart, Timer *timer, uint16_t addr) {
     }
     if (addr < 0xC000) {
         if (cart->ram_enabled && cart->ram) {
-            uint32_t ram_addr = (uint32_t)(cart->bank_mode ? (cart->ram_bank * 0x2000) : 0) + (addr - 0xA000);
+            uint8_t num_ram_banks = cart->ram_size >> 13; // each RAM bank is 8KB
+            uint32_t ram_addr = (uint32_t)(cart->bank_mode ? ((cart->ram_bank % num_ram_banks) * 0x2000) : 0) + (addr - 0xA000);
             return cart->ram[ram_addr];
         }
         return 0xFF;
@@ -180,10 +181,9 @@ void mmu_write_byte(MMU *mmu, Cartridge *cart, Timer *timer, uint16_t addr, uint
     }
     if (addr < 0xC000) {
         if (cart->ram_enabled && cart->ram) {
-            uint32_t ram_addr = (uint32_t)(cart->bank_mode ? (cart->ram_bank * 0x2000):0) + (addr - 0xA000);
-            if (ram_addr < cart->ram_size) {
-                cart->ram[ram_addr] = value;
-            }
+            uint8_t num_ram_banks = cart->ram_size >> 13; // each RAM bank is 8KB
+            uint32_t ram_addr = (uint32_t)(cart->bank_mode ? ((cart->ram_bank % num_ram_banks) * 0x2000) : 0) + (addr - 0xA000);
+            cart->ram[ram_addr] = value;
         }
         return;
     }
