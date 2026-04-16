@@ -118,16 +118,16 @@ static void test_sprite_basic(void) {
     mmu.vram[0x10] = 0xFF; /* byte1 = 0xFF */
     mmu.vram[0x11] = 0x00; /* byte2 = 0x00 -> color 1 */
 
-    /* OAM entry 0: Y=16 (screen Y=8), X=8 (screen X=0), tile=1, flags=0 */
+    /* OAM entry 0: Y=16 (screen Y=0), X=8 (screen X=0), tile=1, flags=0 */
     mmu.oam[0] = 16;  /* Y position (sprite_y - 16 + 8 = screen line) */
     mmu.oam[1] = 8;   /* X position */
     mmu.oam[2] = 1;   /* Tile number */
     mmu.oam[3] = 0;   /* Flags */
 
     /* Render line 8 (where sprite Y=16 means screen Y=8) */
-    ppu_render_scanline(&mmu, 8);
+    ppu_render_scanline(&mmu, 0);
     /* Sprite color 1 with OBP0 identity palette -> palette index 1 = light gray */
-    ASSERT_EQ(0xFFAAAAAA, mmu.framebuffer[8 * 160 + 0], "Sprite pixel 0 is light gray");
+    ASSERT_EQ(0xFFAAAAAA, mmu.framebuffer[0 * 160 + 0], "Sprite pixel 0 is light gray");
 }
 
 static void test_sprite_transparency(void) {
@@ -167,10 +167,10 @@ static void test_sprite_x_flip(void) {
     mmu.oam[2] = 1;
     mmu.oam[3] = 0x20; /* X-flip */
 
-    ppu_render_scanline(&mmu, 8);
+    ppu_render_scanline(&mmu, 0);
     /* Without flip: pixel 0 has color. With X-flip: pixel 7 has color */
-    ASSERT_EQ(0xFFFFFFFF, mmu.framebuffer[8 * 160 + 0], "X-flipped: pixel 0 transparent");
-    ASSERT_EQ(0xFFAAAAAA, mmu.framebuffer[8 * 160 + 7], "X-flipped: pixel 7 has color");
+    ASSERT_EQ(0xFFFFFFFF, mmu.framebuffer[0 * 160 + 0], "X-flipped: pixel 0 transparent");
+    ASSERT_EQ(0xFFAAAAAA, mmu.framebuffer[0 * 160 + 7], "X-flipped: pixel 7 has color");
 }
 
 /* ========== Window rendering ========== */
@@ -215,11 +215,11 @@ static void test_sprite_limit(void) {
         mmu.oam[i * 4 + 3] = 0;
     }
 
-    ppu_render_scanline(&mmu, 8);
+    ppu_render_scanline(&mmu, 0);
     /* First 10 sprites should render, 11th (at X=88+8=96, screen X=88) should not */
-    ASSERT_EQ(0xFFAAAAAA, mmu.framebuffer[8 * 160 + 0], "Sprite 0 rendered");
+    ASSERT_EQ(0xFFAAAAAA, mmu.framebuffer[0 * 160 + 0], "Sprite 0 rendered");
     /* The 11th sprite at screen X=80 should not render (BG white) */
-    ASSERT_EQ(0xFFFFFFFF, mmu.framebuffer[8 * 160 + 80], "11th sprite not rendered (limit)");
+    ASSERT_EQ(0xFFFFFFFF, mmu.framebuffer[0 * 160 + 80], "11th sprite not rendered (limit)");
 }
 
 void run_ppu_tests(void) {
