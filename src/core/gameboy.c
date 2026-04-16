@@ -15,20 +15,7 @@ void gb_init(void) {
     cpu_init(&gb.cpu);
     mmu_init(&gb.mmu);
     ppu_init(&gb.mmu);
-
-    gb.cart.rom = NULL;
-    gb.cart.rom_size = 0;
-    gb.cart.rom_nr_bits = 0;
-    gb.cart.rom_bank = 1;
-    gb.cart.ram = NULL;
-    gb.cart.ram_size = 0;
-    gb.cart.ram_bank = 0;
-    gb.cart.ram_enabled = false;
-    gb.cart.type = 0;
-    gb.cart.rtc_mode = false;
-    gb.cart.boot_rom = NULL;
-    gb.cart.boot_rom_size = 0;
-    gb.cart.boot_rom_enabled = false;
+    cart_init(&gb.cart);
 
     gb.apu.sample_count = 0;
     timer_init(&gb.mmu, &gb.timer);
@@ -46,25 +33,8 @@ void gb_load_boot_rom(const uint8_t *rom, uint32_t size) {
 }
 
 void gb_load_rom(const uint8_t *rom, uint32_t size) {
-    gb.cart.rom_size = size;
-    gb.cart.rom = rom;
-    gb.cart.type = rom[0x147];
-    gb.cart.rom_nr_bits = rom[0x148];
-    uint8_t ram_size_byte = rom[0x149];
-    switch (ram_size_byte) {
-        case 0x02: gb.cart.ram_size = 8 * 1024; break;
-        case 0x03: gb.cart.ram_size = 32 * 1024; break;
-        case 0x04: gb.cart.ram_size = 128 * 1024; break;
-        case 0x05: gb.cart.ram_size = 64 * 1024; break;
-        default:   gb.cart.ram_size = 0; break;
-    }
-    printf("cart type: 0x%x, rom size: 0x%x ram size: 0x%x, CGB flag: 0x%x\n", rom[0x147], rom[0x148], rom[0x149], rom[0x143]);
-
-    if (gb.cart.ram_size > 0) {
-        gb.cart.ram = malloc(gb.cart.ram_size);
-    }
-
-    gb.cart.rtc_mode = false;
+    cart_load_rom(&gb.cart, rom, size);
+    printf("is_mbc1m: %d\n", gb.cart.is_mbc1m);
 
     gb.running = true;
 }

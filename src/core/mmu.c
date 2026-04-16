@@ -75,24 +75,34 @@ static uint8_t io_reg_read_byte(MMU *mmu, uint16_t addr) {
     return mmu->io[reg] | mask;
 }
 
+static uint8_t mbc1_read_byte(Cartridge *cart, uint16_t addr) {
+     // 0x0000–0x3FFF (fixed bank)
+    if (addr < 0x4000) {
+        uint8_t bank_mask = (1 << (cart->rom_nr_bits + 1)) - 1;
+        uint8_t bank = cart->is_mbc1m ?
+            (cart->bank_mode ? (cart->ram_bank << 4) : 0) & bank_mask
+            : (cart->bank_mode ? (cart->ram_bank << 5) : 0) & bank_mask;
+        uint32_t rom_addr = (uint32_t)bank * 0x4000 + addr;
+        return cart->rom[rom_addr];
+    }
+    // 0x4000–0x7FFF (switchable bank)
+    else {
+        uint8_t bank_mask = (1 << (cart->rom_nr_bits + 1)) - 1;
+        uint8_t bank = cart->is_mbc1m ?
+            ((cart->ram_bank << 4) | cart->rom_bank & 0x0F) & bank_mask
+            : ((cart->ram_bank << 5) | cart->rom_bank & 0x1F) & bank_mask;
+        uint32_t rom_addr = (uint32_t)bank * 0x4000 + (addr - 0x4000);
+        return cart->rom[rom_addr];
+    }
+}
 uint8_t mmu_read_byte(MMU *mmu, Cartridge *cart, Timer *timer, uint16_t addr) {
+    if (addr < 0x100 && cart->boot_rom_enabled && cart->boot_rom) {
+        return cart->boot_rom[addr];
+    }
     if (addr < 0x8000) {
-        if (addr < 0x100 && cart->boot_rom_enabled && cart->boot_rom) {
-            return cart->boot_rom[addr];
-        }
-         // 0x0000–0x3FFF (fixed bank)
-        if (addr < 0x4000) {
-            uint8_t bank_mask = (1 << (cart->rom_nr_bits + 1)) - 1;
-            uint8_t bank = (cart->bank_mode ? (cart->ram_bank << 5) : 0) & bank_mask;
-            uint32_t rom_addr = (uint32_t)bank * 0x4000 + addr;
-            return cart->rom[rom_addr];
-        }
-        // 0x4000–0x7FFF (switchable bank)
-        else {
-            uint8_t bank_mask = (1 << (cart->rom_nr_bits + 1)) - 1;
-            uint8_t bank = ((cart->ram_bank << 5) | cart->rom_bank) & bank_mask;
-            uint32_t rom_addr = (uint32_t)bank * 0x4000 + (addr - 0x4000);
-            return cart->rom[rom_addr];
+        // MBC 1
+        if (cart->type >= 0x01 && cart->type <= 0x03) {
+            return mbc1_read_byte(cart, addr);
         }
     }
     if (addr < 0xA000) {

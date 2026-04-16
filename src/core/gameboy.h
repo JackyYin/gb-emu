@@ -36,6 +36,7 @@ typedef struct {
 typedef struct {
     bool boot_rom_enabled;
     bool ram_enabled;
+    bool is_mbc1m; // 1 MiB Multi-Game Compilation Carts
     bool rtc_mode;
     const uint8_t *rom;
     uint8_t *ram;
@@ -97,6 +98,8 @@ void timer_tick(MMU *mmu, Timer *timer, uint32_t cycles);
 void timer_init(MMU *mmu, Timer *timer);
 void serial_tick(MMU *mmu, Serial *serial, uint32_t cycles);
 void serial_init(Serial *serial);
+void cart_init(Cartridge *cart);
+void cart_load_rom(Cartridge *cart, const uint8_t *rom, uint32_t size);
 
 /* Test harness accessors */
 CPU *gb_get_cpu(void);
