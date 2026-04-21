@@ -41,6 +41,11 @@ static void pop(CPU *cpu, MMU *mmu, Cartridge *cart, Timer *timer, uint8_t *hi, 
     cpu->sp += 2;
 }
 
+/*
+ *  1 M-cycle = 4 T-cycles, always.
+ *  T-cycle = the crystal oscillator tick  (4,194,304 per second)
+ *  M-cycle = one CPU bus operation        (1,048,576 per second)
+ */
 int cpu_step(CPU *cpu, MMU *mmu, Cartridge *cart, Timer *timer) {
     uint8_t opcode;
     int cycles = 0;

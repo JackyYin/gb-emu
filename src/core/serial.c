@@ -1,6 +1,11 @@
 #include "gameboy.h"
 
-#define SERIAL_TRANSFER_CYCLES 1024  /* 8 bits x 128 T-cycles each */
+/* DMG serial internal clock:   8,192 Hz (bit rate)
+ * CPU clock:                   4,194,304 Hz
+ * T-cycles per bit:            4,194,304 / 8,192 = 512
+ * T-cycles per byte:           512 × 8 = 4,096
+ */
+#define SERIAL_TRANSFER_CYCLES 4096  /* 8 bits x 512 T-cycles each */
 
 void serial_tick(MMU *mmu, Serial *serial, uint32_t cycles) {
     if (!serial->transferring) {
