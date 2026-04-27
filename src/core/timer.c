@@ -7,7 +7,9 @@ static const uint32_t tima_thresholds[4] = {
     256,  /* 11: 16384 Hz  = CPU/256  */
 };
 
-void timer_tick(MMU *mmu, Timer *timer, uint32_t cycles) {
+void timer_tick(Bus *bus, uint32_t cycles) {
+    MMU *mmu = bus->mmu;
+    Timer *timer = bus->timer;
     timer->div_counter += cycles;
     while (timer->div_counter >= 256) {
         timer->div_counter -= 256;

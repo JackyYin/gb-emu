@@ -68,14 +68,28 @@ typedef struct {
 } Serial;
 
 typedef struct {
-    CPU cpu;
-    MMU mmu;
+    uint8_t dma_offset;
+    bool transferring;
+} OAM;
+
+typedef struct {
+    MMU      *mmu;
+    Cartridge *cart;
+    Timer     *timer;
+    OAM       *oam;
+} Bus;
+
+typedef struct {
+    CPU      cpu;
+    MMU      mmu;
     Cartridge cart;
-    APU apu;
-    Timer timer;
-    Serial serial;
+    APU      apu;
+    Timer    timer;
+    Serial   serial;
+    OAM      oam;
+    Bus      bus;
     uint32_t cycles;
-    bool running;
+    bool     running;
 } GameBoy;
 
 void gb_init(void);
@@ -87,19 +101,21 @@ void gb_set_joypad(uint8_t state);
 float *gb_get_audio_samples(void);
 uint32_t gb_get_audio_sample_count(void);
 
-int cpu_step(CPU *cpu, MMU *mmu, Cartridge *cart, Timer *timer);
+int cpu_step(CPU *cpu, Bus *bus);
 void cpu_init(CPU *cpu);
 void ppu_render_scanline(MMU *mmu, uint8_t line);
 void ppu_init(MMU *mmu);
 void mmu_init(MMU *mmu);
-uint8_t mmu_read_byte(MMU *mmu, Cartridge *cart, Timer *timer, uint16_t addr);
-void mmu_write_byte(MMU *mmu, Cartridge *cart, Timer *timer, uint16_t addr, uint8_t value);
-void timer_tick(MMU *mmu, Timer *timer, uint32_t cycles);
+uint8_t mmu_read_byte(Bus *bus, uint16_t addr);
+void mmu_write_byte(Bus *bus, uint16_t addr, uint8_t value);
+void timer_tick(Bus *bus, uint32_t cycles);
 void timer_init(MMU *mmu, Timer *timer);
-void serial_tick(MMU *mmu, Serial *serial, uint32_t cycles);
+void serial_tick(Bus *bus, Serial *serial, uint32_t cycles);
 void serial_init(Serial *serial);
 void cart_init(Cartridge *cart);
 void cart_load_rom(Cartridge *cart, const uint8_t *rom, uint32_t size);
+void oam_init(OAM *oam);
+void oam_tick(Bus *bus, uint32_t cycles);
 
 /* Test harness accessors */
 CPU *gb_get_cpu(void);

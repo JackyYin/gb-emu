@@ -22,6 +22,12 @@ void gb_init(void) {
     serial_init(&gb.serial);
     serial_buf_len = 0;
     test_done = false;
+    oam_init(&gb.oam);
+
+    gb.bus.mmu   = &gb.mmu;
+    gb.bus.cart  = &gb.cart;
+    gb.bus.timer = &gb.timer;
+    gb.bus.oam   = &gb.oam;
 }
 
 void gb_load_boot_rom(const uint8_t *rom, uint32_t size) {
@@ -51,24 +57,25 @@ void gb_run_frame(void) {
         /* Detect infinite loop: JR -2 (0x18 0xFE) or HALT loop */
         if (!test_done) {
             uint16_t pc = gb.cpu.pc;
-            uint8_t b0 = mmu_read_byte(&gb.mmu, &gb.cart, &gb.timer, pc);
-            uint8_t b1 = mmu_read_byte(&gb.mmu, &gb.cart, &gb.timer, pc + 1);
+            uint8_t b0 = mmu_read_byte(&gb.bus, pc);
+            uint8_t b1 = mmu_read_byte(&gb.bus, pc + 1);
             if (b0 == 0x18 && b1 == 0xFE) {
                 test_done = true;
             }
         }
 
-        int cycles = cpu_step(&gb.cpu, &gb.mmu, &gb.cart, &gb.timer);
+        int cycles = cpu_step(&gb.cpu, &gb.bus);
         frame_cycles += cycles;
         gb.cycles += cycles;
         scanline_cycles += cycles;
 
-        timer_tick(&gb.mmu, &gb.timer, cycles);
+        timer_tick(&gb.bus, cycles);
+        oam_tick(&gb.bus, cycles);
 
         /* Capture serial byte before transfer overwrites SB */
         uint8_t old_sc = gb.mmu.io[0x02];
         uint8_t old_sb = gb.mmu.io[0x01];
-        serial_tick(&gb.mmu, &gb.serial, cycles);
+        serial_tick(&gb.bus, &gb.serial, cycles);
         if ((old_sc & 0x80) && !(gb.mmu.io[0x02] & 0x80)) {
             if (serial_buf_len < (int)sizeof(serial_buf) - 1) {
                 serial_buf[serial_buf_len] = (char)old_sb;

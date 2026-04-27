@@ -7,7 +7,8 @@
  */
 #define SERIAL_TRANSFER_CYCLES 4096  /* 8 bits x 512 T-cycles each */
 
-void serial_tick(MMU *mmu, Serial *serial, uint32_t cycles) {
+void serial_tick(Bus *bus, Serial *serial, uint32_t cycles) {
+    MMU *mmu = bus->mmu;
     if (!serial->transferring) {
         /* Detect new transfer: SC bit 7 (start) + bit 0 (internal clock) */
         if ((mmu->io[0x02] & 0x81) == 0x81) {

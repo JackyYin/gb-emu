@@ -1,5 +1,6 @@
 #include "gameboy.h"
 #include <stdio.h>
+#include <assert.h>
 
 /*
  * IO register read masks (0xFF00-0xFF7F):
@@ -95,7 +96,10 @@ static uint8_t mbc1_read_byte(Cartridge *cart, uint16_t addr) {
         return cart->rom[rom_addr];
     }
 }
-uint8_t mmu_read_byte(MMU *mmu, Cartridge *cart, Timer *timer, uint16_t addr) {
+uint8_t mmu_read_byte(Bus *bus, uint16_t addr) {
+    MMU *mmu = bus->mmu;
+    Cartridge *cart = bus->cart;
+    Timer *timer = bus->timer;
     if (addr < 0x100 && cart->boot_rom_enabled && cart->boot_rom) {
         return cart->boot_rom[addr];
     }
@@ -104,6 +108,7 @@ uint8_t mmu_read_byte(MMU *mmu, Cartridge *cart, Timer *timer, uint16_t addr) {
         if (cart->type >= 0x01 && cart->type <= 0x03) {
             return mbc1_read_byte(cart, addr);
         }
+        return cart->rom[addr];
     }
     if (addr < 0xA000) {
         return mmu->vram[addr - 0x8000];
@@ -167,7 +172,10 @@ static void mbc1_write_byte(Cartridge *cart, uint16_t addr, uint8_t value) {
     }
 }
 
-void mmu_write_byte(MMU *mmu, Cartridge *cart, Timer *timer, uint16_t addr, uint8_t value) {
+void mmu_write_byte(Bus *bus, uint16_t addr, uint8_t value) {
+    MMU *mmu = bus->mmu;
+    Cartridge *cart = bus->cart;
+    Timer *timer = bus->timer;
     if (addr < 0x8000) {
         // MBC 1
         if (cart->type >= 0x01 && cart->type <= 0x03) {
@@ -246,12 +254,11 @@ void mmu_write_byte(MMU *mmu, Cartridge *cart, Timer *timer, uint16_t addr, uint
             mmu->io[0x44] = 0;
             return;
         }
+        /* triggering DMA transfer */
         if (addr == 0xFF46) {
             mmu->io[0x46] = value;
-            uint16_t src = ((uint16_t)value) << 8;
-            for (int i = 0; i < 0xA0; i++) {
-                mmu->oam[i] = mmu_read_byte(mmu, cart, timer, src + i);
-            }
+            bus->oam->dma_offset = 0;
+            bus->oam->transferring = true;
             return;
         }
         if (addr == 0xFF50) {

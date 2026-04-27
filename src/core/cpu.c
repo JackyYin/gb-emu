@@ -1,43 +1,41 @@
 #include "gameboy.h"
 #include <stdio.h>
 
-uint8_t mmu_read_byte(MMU *mmu, Cartridge *cart, Timer *timer, uint16_t addr);
-void mmu_write_byte(MMU *mmu, Cartridge *cart, Timer *timer, uint16_t addr, uint8_t value);
 
 #define FLAG_Z 0x80
 #define FLAG_N 0x40
 #define FLAG_H 0x20
 #define FLAG_C 0x10
 
-static uint8_t read_byte(CPU *cpu, MMU *mmu, Cartridge *cart, Timer *timer) {
-    uint8_t val = mmu_read_byte(mmu, cart, timer, cpu->pc);
+static uint8_t read_byte(CPU *cpu, Bus *bus) {
+    uint8_t val = mmu_read_byte(bus, cpu->pc);
     cpu->pc++;
     return val;
 }
 
-static uint16_t read_word(CPU *cpu, MMU *mmu, Cartridge *cart, Timer *timer) {
-    uint16_t lo = read_byte(cpu, mmu, cart, timer);
-    uint16_t hi = read_byte(cpu, mmu, cart, timer);
+static uint16_t read_word(CPU *cpu, Bus *bus) {
+    uint16_t lo = read_byte(cpu, bus);
+    uint16_t hi = read_byte(cpu, bus);
     return (hi << 8) | lo;
 }
 
-static uint8_t read_mem(CPU *cpu, MMU *mmu, Cartridge *cart, Timer *timer, uint16_t addr) {
-    return mmu_read_byte(mmu, cart, timer, addr);
+static uint8_t read_mem(CPU *cpu, Bus *bus, uint16_t addr) {
+    return mmu_read_byte(bus, addr);
 }
 
-static void write_mem(CPU *cpu, MMU *mmu, Cartridge *cart, Timer *timer, uint16_t addr, uint8_t val) {
-    mmu_write_byte(mmu, cart, timer, addr, val);
+static void write_mem(CPU *cpu, Bus *bus, uint16_t addr, uint8_t val) {
+    mmu_write_byte(bus, addr, val);
 }
 
-static void push(CPU *cpu, MMU *mmu, Cartridge *cart, Timer *timer, uint8_t hi, uint8_t lo) {
+static void push(CPU *cpu, Bus *bus, uint8_t hi, uint8_t lo) {
     cpu->sp -= 2;
-    write_mem(cpu, mmu, cart, timer, cpu->sp, lo);
-    write_mem(cpu, mmu, cart, timer, cpu->sp + 1, hi);
+    write_mem(cpu, bus, cpu->sp, lo);
+    write_mem(cpu, bus, cpu->sp + 1, hi);
 }
 
-static void pop(CPU *cpu, MMU *mmu, Cartridge *cart, Timer *timer, uint8_t *hi, uint8_t *lo) {
-    *lo = read_mem(cpu, mmu, cart, timer, cpu->sp);
-    *hi = read_mem(cpu, mmu, cart, timer, cpu->sp + 1);
+static void pop(CPU *cpu, Bus *bus, uint8_t *hi, uint8_t *lo) {
+    *lo = read_mem(cpu, bus, cpu->sp);
+    *hi = read_mem(cpu, bus, cpu->sp + 1);
     cpu->sp += 2;
 }
 
@@ -46,7 +44,8 @@ static void pop(CPU *cpu, MMU *mmu, Cartridge *cart, Timer *timer, uint8_t *hi, 
  *  T-cycle = the crystal oscillator tick  (4,194,304 per second)
  *  M-cycle = one CPU bus operation        (1,048,576 per second)
  */
-int cpu_step(CPU *cpu, MMU *mmu, Cartridge *cart, Timer *timer) {
+int cpu_step(CPU *cpu, Bus *bus) {
+    MMU *mmu = bus->mmu;
     uint8_t opcode;
     int cycles = 0;
 
@@ -74,47 +73,47 @@ int cpu_step(CPU *cpu, MMU *mmu, Cartridge *cart, Timer *timer) {
             if (pending & 0x01) {
                 mmu->io[0x0F] &= ~0x01;
                 cpu->sp -= 2;
-                write_mem(cpu, mmu, cart, timer, cpu->sp, cpu->pc & 0xFF);
-                write_mem(cpu, mmu, cart, timer, cpu->sp + 1, cpu->pc >> 8);
+                write_mem(cpu, bus, cpu->sp, cpu->pc & 0xFF);
+                write_mem(cpu, bus, cpu->sp + 1, cpu->pc >> 8);
                 cpu->pc = 0x0040;
                 return 20;
             }
             if (pending & 0x02) {
                 mmu->io[0x0F] &= ~0x02;
                 cpu->sp -= 2;
-                write_mem(cpu, mmu, cart, timer, cpu->sp, cpu->pc & 0xFF);
-                write_mem(cpu, mmu, cart, timer, cpu->sp + 1, cpu->pc >> 8);
+                write_mem(cpu, bus, cpu->sp, cpu->pc & 0xFF);
+                write_mem(cpu, bus, cpu->sp + 1, cpu->pc >> 8);
                 cpu->pc = 0x0048;
                 return 20;
             }
             if (pending & 0x04) {
                 mmu->io[0x0F] &= ~0x04;
                 cpu->sp -= 2;
-                write_mem(cpu, mmu, cart, timer, cpu->sp, cpu->pc & 0xFF);
-                write_mem(cpu, mmu, cart, timer, cpu->sp + 1, cpu->pc >> 8);
+                write_mem(cpu, bus, cpu->sp, cpu->pc & 0xFF);
+                write_mem(cpu, bus, cpu->sp + 1, cpu->pc >> 8);
                 cpu->pc = 0x0050;
                 return 20;
             }
             if (pending & 0x08) {
                 mmu->io[0x0F] &= ~0x08;
                 cpu->sp -= 2;
-                write_mem(cpu, mmu, cart, timer, cpu->sp, cpu->pc & 0xFF);
-                write_mem(cpu, mmu, cart, timer, cpu->sp + 1, cpu->pc >> 8);
+                write_mem(cpu, bus, cpu->sp, cpu->pc & 0xFF);
+                write_mem(cpu, bus, cpu->sp + 1, cpu->pc >> 8);
                 cpu->pc = 0x0058;
                 return 20;
             }
             if (pending & 0x10) {
                 mmu->io[0x0F] &= ~0x10;
                 cpu->sp -= 2;
-                write_mem(cpu, mmu, cart, timer, cpu->sp, cpu->pc & 0xFF);
-                write_mem(cpu, mmu, cart, timer, cpu->sp + 1, cpu->pc >> 8);
+                write_mem(cpu, bus, cpu->sp, cpu->pc & 0xFF);
+                write_mem(cpu, bus, cpu->sp + 1, cpu->pc >> 8);
                 cpu->pc = 0x0060;
                 return 20;
             }
         }
     }
 
-    opcode = read_byte(cpu, mmu, cart, timer);
+    opcode = read_byte(cpu, bus);
 
     /* HALT bug: the byte after HALT is read twice (PC fails to increment) */
     if (cpu->halt_bug) {
@@ -127,12 +126,12 @@ int cpu_step(CPU *cpu, MMU *mmu, Cartridge *cart, Timer *timer) {
             cycles = 4;
             break;
         case 0x01: /* LD BC, d16 */
-            cpu->c = read_byte(cpu, mmu, cart, timer);
-            cpu->b = read_byte(cpu, mmu, cart, timer);
+            cpu->c = read_byte(cpu, bus);
+            cpu->b = read_byte(cpu, bus);
             cycles = 12;
             break;
         case 0x02: /* LD (BC), A */
-            write_mem(cpu, mmu, cart, timer, (uint16_t)cpu->b << 8 | cpu->c, cpu->a);
+            write_mem(cpu, bus, (uint16_t)cpu->b << 8 | cpu->c, cpu->a);
             cycles = 8;
             break;
         case 0x03: /* INC BC */
@@ -157,7 +156,7 @@ int cpu_step(CPU *cpu, MMU *mmu, Cartridge *cart, Timer *timer) {
             cycles = 4;
             break;
         case 0x06: /* LD B, d8 */
-            cpu->b = read_byte(cpu, mmu, cart, timer);
+            cpu->b = read_byte(cpu, bus);
             cycles = 8;
             break;
         case 0x07: /* RLCA */
@@ -167,9 +166,9 @@ int cpu_step(CPU *cpu, MMU *mmu, Cartridge *cart, Timer *timer) {
             break;
         case 0x08: /* LD (a16), SP */
             {
-                uint16_t addr = read_word(cpu, mmu, cart, timer);
-                write_mem(cpu, mmu, cart, timer, addr, cpu->sp & 0xFF);
-                write_mem(cpu, mmu, cart, timer, addr + 1, cpu->sp >> 8);
+                uint16_t addr = read_word(cpu, bus);
+                write_mem(cpu, bus, addr, cpu->sp & 0xFF);
+                write_mem(cpu, bus, addr + 1, cpu->sp >> 8);
             }
             cycles = 20;
             break;
@@ -185,7 +184,7 @@ int cpu_step(CPU *cpu, MMU *mmu, Cartridge *cart, Timer *timer) {
             cycles = 8;
             break;
         case 0x0A: /* LD A, (BC) */
-            cpu->a = read_mem(cpu, mmu, cart, timer, (uint16_t)cpu->b << 8 | cpu->c);
+            cpu->a = read_mem(cpu, bus, (uint16_t)cpu->b << 8 | cpu->c);
             cycles = 8;
             break;
         case 0x0B: /* DEC BC */
@@ -210,7 +209,7 @@ int cpu_step(CPU *cpu, MMU *mmu, Cartridge *cart, Timer *timer) {
             cycles = 4;
             break;
         case 0x0E: /* LD C, d8 */
-            cpu->c = read_byte(cpu, mmu, cart, timer);
+            cpu->c = read_byte(cpu, bus);
             cycles = 8;
             break;
         case 0x0F: /* RRCA */
@@ -219,16 +218,16 @@ int cpu_step(CPU *cpu, MMU *mmu, Cartridge *cart, Timer *timer) {
             cycles = 4;
             break;
         case 0x10: /* STOP */
-            read_byte(cpu, mmu, cart, timer);
+            read_byte(cpu, bus);
             cycles = 4;
             break;
         case 0x11: /* LD DE, d16 */
-            cpu->e = read_byte(cpu, mmu, cart, timer);
-            cpu->d = read_byte(cpu, mmu, cart, timer);
+            cpu->e = read_byte(cpu, bus);
+            cpu->d = read_byte(cpu, bus);
             cycles = 12;
             break;
         case 0x12: /* LD (DE), A */
-            write_mem(cpu, mmu, cart, timer, (uint16_t)cpu->d << 8 | cpu->e, cpu->a);
+            write_mem(cpu, bus, (uint16_t)cpu->d << 8 | cpu->e, cpu->a);
             cycles = 8;
             break;
         case 0x13: /* INC DE */
@@ -253,7 +252,7 @@ int cpu_step(CPU *cpu, MMU *mmu, Cartridge *cart, Timer *timer) {
             cycles = 4;
             break;
         case 0x16: /* LD D, d8 */
-            cpu->d = read_byte(cpu, mmu, cart, timer);
+            cpu->d = read_byte(cpu, bus);
             cycles = 8;
             break;
         case 0x17: /* RLA */
@@ -266,7 +265,7 @@ int cpu_step(CPU *cpu, MMU *mmu, Cartridge *cart, Timer *timer) {
             break;
         case 0x18: /* JR r8 */
             {
-                int8_t offset = (int8_t)read_byte(cpu, mmu, cart, timer);
+                int8_t offset = (int8_t)read_byte(cpu, bus);
                 cpu->pc += offset;
                 cycles = 12;
             }
@@ -283,7 +282,7 @@ int cpu_step(CPU *cpu, MMU *mmu, Cartridge *cart, Timer *timer) {
             cycles = 8;
             break;
         case 0x1A: /* LD A, (DE) */
-            cpu->a = read_mem(cpu, mmu, cart, timer, (uint16_t)cpu->d << 8 | cpu->e);
+            cpu->a = read_mem(cpu, bus, (uint16_t)cpu->d << 8 | cpu->e);
             cycles = 8;
             break;
         case 0x1B: /* DEC DE */
@@ -308,7 +307,7 @@ int cpu_step(CPU *cpu, MMU *mmu, Cartridge *cart, Timer *timer) {
             cycles = 4;
             break;
         case 0x1E: /* LD E, d8 */
-            cpu->e = read_byte(cpu, mmu, cart, timer);
+            cpu->e = read_byte(cpu, bus);
             cycles = 8;
             break;
         case 0x1F: /* RRA */
@@ -321,7 +320,7 @@ int cpu_step(CPU *cpu, MMU *mmu, Cartridge *cart, Timer *timer) {
             break;
         case 0x20: /* JR NZ, r8 */
             {
-                int8_t offset = (int8_t)read_byte(cpu, mmu, cart, timer);
+                int8_t offset = (int8_t)read_byte(cpu, bus);
                 if (!(cpu->f & FLAG_Z)) {
                     cpu->pc += offset;
                     cycles = 12;
@@ -331,12 +330,12 @@ int cpu_step(CPU *cpu, MMU *mmu, Cartridge *cart, Timer *timer) {
             }
             break;
         case 0x21: /* LD HL, d16 */
-            cpu->l = read_byte(cpu, mmu, cart, timer);
-            cpu->h = read_byte(cpu, mmu, cart, timer);
+            cpu->l = read_byte(cpu, bus);
+            cpu->h = read_byte(cpu, bus);
             cycles = 12;
             break;
         case 0x22: /* LD (HL+), A */
-            write_mem(cpu, mmu, cart, timer, (uint16_t)cpu->h << 8 | cpu->l, cpu->a);
+            write_mem(cpu, bus, (uint16_t)cpu->h << 8 | cpu->l, cpu->a);
             {
                 uint16_t hl = (uint16_t)cpu->h << 8 | cpu->l;
                 hl++;
@@ -367,7 +366,7 @@ int cpu_step(CPU *cpu, MMU *mmu, Cartridge *cart, Timer *timer) {
             cycles = 4;
             break;
         case 0x26: /* LD H, d8 */
-            cpu->h = read_byte(cpu, mmu, cart, timer);
+            cpu->h = read_byte(cpu, bus);
             cycles = 8;
             break;
         case 0x27: /* DAA */
@@ -401,7 +400,7 @@ int cpu_step(CPU *cpu, MMU *mmu, Cartridge *cart, Timer *timer) {
             break;
         case 0x28: /* JR Z, r8 */
             {
-                int8_t offset = (int8_t)read_byte(cpu, mmu, cart, timer);
+                int8_t offset = (int8_t)read_byte(cpu, bus);
                 if (cpu->f & FLAG_Z) {
                     cpu->pc += offset;
                     cycles = 12;
@@ -421,7 +420,7 @@ int cpu_step(CPU *cpu, MMU *mmu, Cartridge *cart, Timer *timer) {
             cycles = 8;
             break;
         case 0x2A: /* LD A, (HL+) */
-            cpu->a = read_mem(cpu, mmu, cart, timer, (uint16_t)cpu->h << 8 | cpu->l);
+            cpu->a = read_mem(cpu, bus, (uint16_t)cpu->h << 8 | cpu->l);
             {
                 uint16_t hl = (uint16_t)cpu->h << 8 | cpu->l;
                 hl++;
@@ -452,7 +451,7 @@ int cpu_step(CPU *cpu, MMU *mmu, Cartridge *cart, Timer *timer) {
             cycles = 4;
             break;
         case 0x2E: /* LD L, d8 */
-            cpu->l = read_byte(cpu, mmu, cart, timer);
+            cpu->l = read_byte(cpu, bus);
             cycles = 8;
             break;
         case 0x2F: /* CPL */
@@ -462,7 +461,7 @@ int cpu_step(CPU *cpu, MMU *mmu, Cartridge *cart, Timer *timer) {
             break;
         case 0x30: /* JR NC, r8 */
             {
-                int8_t offset = (int8_t)read_byte(cpu, mmu, cart, timer);
+                int8_t offset = (int8_t)read_byte(cpu, bus);
                 if (!(cpu->f & FLAG_C)) {
                     cpu->pc += offset;
                     cycles = 12;
@@ -472,11 +471,11 @@ int cpu_step(CPU *cpu, MMU *mmu, Cartridge *cart, Timer *timer) {
             }
             break;
         case 0x31: /* LD SP, d16 */
-            cpu->sp = read_word(cpu, mmu, cart, timer);
+            cpu->sp = read_word(cpu, bus);
             cycles = 12;
             break;
         case 0x32: /* LD (HL-), A */
-            write_mem(cpu, mmu, cart, timer, (uint16_t)cpu->h << 8 | cpu->l, cpu->a);
+            write_mem(cpu, bus, (uint16_t)cpu->h << 8 | cpu->l, cpu->a);
             {
                 uint16_t hl = (uint16_t)cpu->h << 8 | cpu->l;
                 hl--;
@@ -492,27 +491,27 @@ int cpu_step(CPU *cpu, MMU *mmu, Cartridge *cart, Timer *timer) {
         case 0x34: /* INC (HL) */
             {
                 uint16_t addr = (uint16_t)cpu->h << 8 | cpu->l;
-                uint8_t val = read_mem(cpu, mmu, cart, timer, addr);
+                uint8_t val = read_mem(cpu, bus, addr);
                 cpu->f = (cpu->f & FLAG_C) | ((val & 0x0F) == 0x0F ? FLAG_H : 0);
                 val++;
                 cpu->f |= (val == 0 ? FLAG_Z : 0);
-                write_mem(cpu, mmu, cart, timer, addr, val);
+                write_mem(cpu, bus, addr, val);
             }
             cycles = 12;
             break;
         case 0x35: /* DEC (HL) */
             {
                 uint16_t addr = (uint16_t)cpu->h << 8 | cpu->l;
-                uint8_t val = read_mem(cpu, mmu, cart, timer, addr);
+                uint8_t val = read_mem(cpu, bus, addr);
                 cpu->f = FLAG_N | (cpu->f & FLAG_C) | ((val & 0x0F) == 0x00 ? FLAG_H : 0);
                 val--;
                 cpu->f |= (val == 0 ? FLAG_Z : 0);
-                write_mem(cpu, mmu, cart, timer, addr, val);
+                write_mem(cpu, bus, addr, val);
             }
             cycles = 12;
             break;
         case 0x36: /* LD (HL), d8 */
-            write_mem(cpu, mmu, cart, timer, (uint16_t)cpu->h << 8 | cpu->l, read_byte(cpu, mmu, cart, timer));
+            write_mem(cpu, bus, (uint16_t)cpu->h << 8 | cpu->l, read_byte(cpu, bus));
             cycles = 12;
             break;
         case 0x37: /* SCF */
@@ -522,7 +521,7 @@ int cpu_step(CPU *cpu, MMU *mmu, Cartridge *cart, Timer *timer) {
             break;
         case 0x38: /* JR C, r8 */
             {
-                int8_t offset = (int8_t)read_byte(cpu, mmu, cart, timer);
+                int8_t offset = (int8_t)read_byte(cpu, bus);
                 if (cpu->f & FLAG_C) {
                     cpu->pc += offset;
                     cycles = 12;
@@ -542,7 +541,7 @@ int cpu_step(CPU *cpu, MMU *mmu, Cartridge *cart, Timer *timer) {
             cycles = 8;
             break;
         case 0x3A: /* LD A, (HL-) */
-            cpu->a = read_mem(cpu, mmu, cart, timer, (uint16_t)cpu->h << 8 | cpu->l);
+            cpu->a = read_mem(cpu, bus, (uint16_t)cpu->h << 8 | cpu->l);
             {
                 uint16_t hl = (uint16_t)cpu->h << 8 | cpu->l;
                 hl--;
@@ -568,7 +567,7 @@ int cpu_step(CPU *cpu, MMU *mmu, Cartridge *cart, Timer *timer) {
             cycles = 4;
             break;
         case 0x3E: /* LD A, d8 */
-            cpu->a = read_byte(cpu, mmu, cart, timer);
+            cpu->a = read_byte(cpu, bus);
             cycles = 8;
             break;
         case 0x3F: /* CCF */
@@ -600,7 +599,7 @@ int cpu_step(CPU *cpu, MMU *mmu, Cartridge *cart, Timer *timer) {
             cycles = 4;
             break;
         case 0x46: /* LD B, (HL) */
-            cpu->b = read_mem(cpu, mmu, cart, timer, (uint16_t)cpu->h << 8 | cpu->l);
+            cpu->b = read_mem(cpu, bus, (uint16_t)cpu->h << 8 | cpu->l);
             cycles = 8;
             break;
         case 0x47: /* LD B, A */
@@ -631,7 +630,7 @@ int cpu_step(CPU *cpu, MMU *mmu, Cartridge *cart, Timer *timer) {
             cycles = 4;
             break;
         case 0x4E: /* LD C, (HL) */
-            cpu->c = read_mem(cpu, mmu, cart, timer, (uint16_t)cpu->h << 8 | cpu->l);
+            cpu->c = read_mem(cpu, bus, (uint16_t)cpu->h << 8 | cpu->l);
             cycles = 8;
             break;
         case 0x4F: /* LD C, A */
@@ -662,7 +661,7 @@ int cpu_step(CPU *cpu, MMU *mmu, Cartridge *cart, Timer *timer) {
             cycles = 4;
             break;
         case 0x56: /* LD D, (HL) */
-            cpu->d = read_mem(cpu, mmu, cart, timer, (uint16_t)cpu->h << 8 | cpu->l);
+            cpu->d = read_mem(cpu, bus, (uint16_t)cpu->h << 8 | cpu->l);
             cycles = 8;
             break;
         case 0x57: /* LD D, A */
@@ -693,7 +692,7 @@ int cpu_step(CPU *cpu, MMU *mmu, Cartridge *cart, Timer *timer) {
             cycles = 4;
             break;
         case 0x5E: /* LD E, (HL) */
-            cpu->e = read_mem(cpu, mmu, cart, timer, (uint16_t)cpu->h << 8 | cpu->l);
+            cpu->e = read_mem(cpu, bus, (uint16_t)cpu->h << 8 | cpu->l);
             cycles = 8;
             break;
         case 0x5F: /* LD E, A */
@@ -724,7 +723,7 @@ int cpu_step(CPU *cpu, MMU *mmu, Cartridge *cart, Timer *timer) {
             cycles = 4;
             break;
         case 0x66: /* LD H, (HL) */
-            cpu->h = read_mem(cpu, mmu, cart, timer, (uint16_t)cpu->h << 8 | cpu->l);
+            cpu->h = read_mem(cpu, bus, (uint16_t)cpu->h << 8 | cpu->l);
             cycles = 8;
             break;
         case 0x67: /* LD H, A */
@@ -755,7 +754,7 @@ int cpu_step(CPU *cpu, MMU *mmu, Cartridge *cart, Timer *timer) {
             cycles = 4;
             break;
         case 0x6E: /* LD L, (HL) */
-            cpu->l = read_mem(cpu, mmu, cart, timer, (uint16_t)cpu->h << 8 | cpu->l);
+            cpu->l = read_mem(cpu, bus, (uint16_t)cpu->h << 8 | cpu->l);
             cycles = 8;
             break;
         case 0x6F: /* LD L, A */
@@ -763,27 +762,27 @@ int cpu_step(CPU *cpu, MMU *mmu, Cartridge *cart, Timer *timer) {
             cycles = 4;
             break;
         case 0x70: /* LD (HL), B */
-            write_mem(cpu, mmu, cart, timer, (uint16_t)cpu->h << 8 | cpu->l, cpu->b);
+            write_mem(cpu, bus, (uint16_t)cpu->h << 8 | cpu->l, cpu->b);
             cycles = 8;
             break;
         case 0x71: /* LD (HL), C */
-            write_mem(cpu, mmu, cart, timer, (uint16_t)cpu->h << 8 | cpu->l, cpu->c);
+            write_mem(cpu, bus, (uint16_t)cpu->h << 8 | cpu->l, cpu->c);
             cycles = 8;
             break;
         case 0x72: /* LD (HL), D */
-            write_mem(cpu, mmu, cart, timer, (uint16_t)cpu->h << 8 | cpu->l, cpu->d);
+            write_mem(cpu, bus, (uint16_t)cpu->h << 8 | cpu->l, cpu->d);
             cycles = 8;
             break;
         case 0x73: /* LD (HL), E */
-            write_mem(cpu, mmu, cart, timer, (uint16_t)cpu->h << 8 | cpu->l, cpu->e);
+            write_mem(cpu, bus, (uint16_t)cpu->h << 8 | cpu->l, cpu->e);
             cycles = 8;
             break;
         case 0x74: /* LD (HL), H */
-            write_mem(cpu, mmu, cart, timer, (uint16_t)cpu->h << 8 | cpu->l, cpu->h);
+            write_mem(cpu, bus, (uint16_t)cpu->h << 8 | cpu->l, cpu->h);
             cycles = 8;
             break;
         case 0x75: /* LD (HL), L */
-            write_mem(cpu, mmu, cart, timer, (uint16_t)cpu->h << 8 | cpu->l, cpu->l);
+            write_mem(cpu, bus, (uint16_t)cpu->h << 8 | cpu->l, cpu->l);
             cycles = 8;
             break;
         case 0x76: /* HALT */
@@ -797,7 +796,7 @@ int cpu_step(CPU *cpu, MMU *mmu, Cartridge *cart, Timer *timer) {
             cycles = 4;
             break;
         case 0x77: /* LD (HL), A */
-            write_mem(cpu, mmu, cart, timer, (uint16_t)cpu->h << 8 | cpu->l, cpu->a);
+            write_mem(cpu, bus, (uint16_t)cpu->h << 8 | cpu->l, cpu->a);
             cycles = 8;
             break;
         case 0x78: /* LD A, B */
@@ -825,7 +824,7 @@ int cpu_step(CPU *cpu, MMU *mmu, Cartridge *cart, Timer *timer) {
             cycles = 4;
             break;
         case 0x7E: /* LD A, (HL) */
-            cpu->a = read_mem(cpu, mmu, cart, timer, (uint16_t)cpu->h << 8 | cpu->l);
+            cpu->a = read_mem(cpu, bus, (uint16_t)cpu->h << 8 | cpu->l);
             cycles = 8;
             break;
         case 0x7F: /* LD A, A */
@@ -875,7 +874,7 @@ int cpu_step(CPU *cpu, MMU *mmu, Cartridge *cart, Timer *timer) {
             break;
         case 0x86: /* ADD A, (HL) */
             {
-                uint8_t val = read_mem(cpu, mmu, cart, timer, (uint16_t)cpu->h << 8 | cpu->l);
+                uint8_t val = read_mem(cpu, bus, (uint16_t)cpu->h << 8 | cpu->l);
                 cpu->f = (cpu->a + val > 0xFF ? FLAG_C : 0) |
                          ((cpu->a & 0x0F) + (val & 0x0F) > 0x0F ? FLAG_H : 0);
                 cpu->a += val;
@@ -958,7 +957,7 @@ int cpu_step(CPU *cpu, MMU *mmu, Cartridge *cart, Timer *timer) {
             break;
         case 0x8E: /* ADC A, (HL) */
             {
-                uint8_t val = read_mem(cpu, mmu, cart, timer, (uint16_t)cpu->h << 8 | cpu->l);
+                uint8_t val = read_mem(cpu, bus, (uint16_t)cpu->h << 8 | cpu->l);
                 uint8_t c = (cpu->f & FLAG_C) ? 1 : 0;
                 uint16_t sum = cpu->a + val + c;
                 cpu->f = (sum > 0xFF ? FLAG_C : 0) |
@@ -1029,7 +1028,7 @@ int cpu_step(CPU *cpu, MMU *mmu, Cartridge *cart, Timer *timer) {
             break;
         case 0x96: /* SUB (HL) */
             {
-                uint8_t val = read_mem(cpu, mmu, cart, timer, (uint16_t)cpu->h << 8 | cpu->l);
+                uint8_t val = read_mem(cpu, bus, (uint16_t)cpu->h << 8 | cpu->l);
                 cpu->f = FLAG_N |
                          (cpu->a < val ? FLAG_C : 0) |
                          ((cpu->a & 0x0F) < (val & 0x0F) ? FLAG_H : 0);
@@ -1117,7 +1116,7 @@ int cpu_step(CPU *cpu, MMU *mmu, Cartridge *cart, Timer *timer) {
             break;
         case 0x9E: /* SBC A, (HL) */
             {
-                uint8_t val = read_mem(cpu, mmu, cart, timer, (uint16_t)cpu->h << 8 | cpu->l);
+                uint8_t val = read_mem(cpu, bus, (uint16_t)cpu->h << 8 | cpu->l);
                 uint8_t c = (cpu->f & FLAG_C) ? 1 : 0;
                 uint16_t res = cpu->a - val - c;
                 cpu->f = FLAG_N |
@@ -1168,7 +1167,7 @@ int cpu_step(CPU *cpu, MMU *mmu, Cartridge *cart, Timer *timer) {
             cycles = 4;
             break;
         case 0xA6: /* AND (HL) */
-            cpu->a &= read_mem(cpu, mmu, cart, timer, (uint16_t)cpu->h << 8 | cpu->l);
+            cpu->a &= read_mem(cpu, bus, (uint16_t)cpu->h << 8 | cpu->l);
             cpu->f = FLAG_H | (cpu->a == 0 ? FLAG_Z : 0);
             cycles = 8;
             break;
@@ -1207,7 +1206,7 @@ int cpu_step(CPU *cpu, MMU *mmu, Cartridge *cart, Timer *timer) {
             cycles = 4;
             break;
         case 0xAE: /* XOR (HL) */
-            cpu->a ^= read_mem(cpu, mmu, cart, timer, (uint16_t)cpu->h << 8 | cpu->l);
+            cpu->a ^= read_mem(cpu, bus, (uint16_t)cpu->h << 8 | cpu->l);
             cpu->f = (cpu->a == 0 ? FLAG_Z : 0);
             cycles = 8;
             break;
@@ -1247,7 +1246,7 @@ int cpu_step(CPU *cpu, MMU *mmu, Cartridge *cart, Timer *timer) {
             cycles = 4;
             break;
         case 0xB6: /* OR (HL) */
-            cpu->a |= read_mem(cpu, mmu, cart, timer, (uint16_t)cpu->h << 8 | cpu->l);
+            cpu->a |= read_mem(cpu, bus, (uint16_t)cpu->h << 8 | cpu->l);
             cpu->f = (cpu->a == 0 ? FLAG_Z : 0);
             cycles = 8;
             break;
@@ -1299,7 +1298,7 @@ int cpu_step(CPU *cpu, MMU *mmu, Cartridge *cart, Timer *timer) {
             break;
         case 0xBE: /* CP (HL) */
             {
-                uint8_t val = read_mem(cpu, mmu, cart, timer, (uint16_t)cpu->h << 8 | cpu->l);
+                uint8_t val = read_mem(cpu, bus, (uint16_t)cpu->h << 8 | cpu->l);
                 cpu->f = FLAG_N |
                          (cpu->a < val ? FLAG_C : 0) |
                          ((cpu->a & 0x0F) < (val & 0x0F) ? FLAG_H : 0) |
@@ -1314,20 +1313,20 @@ int cpu_step(CPU *cpu, MMU *mmu, Cartridge *cart, Timer *timer) {
         case 0xC0: /* RET NZ */
             cycles = 8;
             if (!(cpu->f & FLAG_Z)) {
-                uint8_t lo = read_mem(cpu, mmu, cart, timer, cpu->sp);
-                uint8_t hi = read_mem(cpu, mmu, cart, timer, cpu->sp + 1);
+                uint8_t lo = read_mem(cpu, bus, cpu->sp);
+                uint8_t hi = read_mem(cpu, bus, cpu->sp + 1);
                 cpu->sp += 2;
                 cpu->pc = (uint16_t)hi << 8 | lo;
                 cycles = 20;
             }
             break;
         case 0xC1: /* POP BC */
-            pop(cpu, mmu, cart, timer, &cpu->b, &cpu->c);
+            pop(cpu, bus, &cpu->b, &cpu->c);
             cycles = 12;
             break;
         case 0xC2: /* JP NZ, a16 */
             {
-                uint16_t addr = read_word(cpu, mmu, cart, timer);
+                uint16_t addr = read_word(cpu, bus);
                 if (!(cpu->f & FLAG_Z)) {
                     cpu->pc = addr;
                     cycles = 16;
@@ -1337,27 +1336,27 @@ int cpu_step(CPU *cpu, MMU *mmu, Cartridge *cart, Timer *timer) {
             }
             break;
         case 0xC3: /* JP a16 */
-            cpu->pc = read_word(cpu, mmu, cart, timer);
+            cpu->pc = read_word(cpu, bus);
             cycles = 16;
             break;
         case 0xC4: /* CALL NZ, a16 */
             {
-                uint16_t addr = read_word(cpu, mmu, cart, timer);
+                uint16_t addr = read_word(cpu, bus);
                 cycles = 12;
                 if (!(cpu->f & FLAG_Z)) {
-                    push(cpu, mmu, cart, timer, cpu->pc >> 8, cpu->pc & 0xFF);
+                    push(cpu, bus, cpu->pc >> 8, cpu->pc & 0xFF);
                     cpu->pc = addr;
                     cycles = 24;
                 }
             }
             break;
         case 0xC5: /* PUSH BC */
-            push(cpu, mmu, cart, timer, cpu->b, cpu->c);
+            push(cpu, bus, cpu->b, cpu->c);
             cycles = 16;
             break;
         case 0xC6: /* ADD A, d8 */
             {
-                uint8_t val = read_byte(cpu, mmu, cart, timer);
+                uint8_t val = read_byte(cpu, bus);
                 cpu->f = (cpu->a + val > 0xFF ? FLAG_C : 0) |
                          ((cpu->a & 0x0F) + (val & 0x0F) > 0x0F ? FLAG_H : 0);
                 cpu->a += val;
@@ -1366,15 +1365,15 @@ int cpu_step(CPU *cpu, MMU *mmu, Cartridge *cart, Timer *timer) {
             cycles = 8;
             break;
         case 0xC7: /* RST 00H */
-            push(cpu, mmu, cart, timer, cpu->pc >> 8, cpu->pc & 0xFF);
+            push(cpu, bus, cpu->pc >> 8, cpu->pc & 0xFF);
             cpu->pc = 0x0000;
             cycles = 16;
             break;
         case 0xC8: /* RET Z */
             cycles = 8;
             if (cpu->f & FLAG_Z) {
-                uint8_t lo = read_mem(cpu, mmu, cart, timer, cpu->sp);
-                uint8_t hi = read_mem(cpu, mmu, cart, timer, cpu->sp + 1);
+                uint8_t lo = read_mem(cpu, bus, cpu->sp);
+                uint8_t hi = read_mem(cpu, bus, cpu->sp + 1);
                 cpu->sp += 2;
                 cpu->pc = (uint16_t)hi << 8 | lo;
                 cycles = 20;
@@ -1382,8 +1381,8 @@ int cpu_step(CPU *cpu, MMU *mmu, Cartridge *cart, Timer *timer) {
             break;
         case 0xC9: /* RET */
             {
-                uint8_t lo = read_mem(cpu, mmu, cart, timer, cpu->sp);
-                uint8_t hi = read_mem(cpu, mmu, cart, timer, cpu->sp + 1);
+                uint8_t lo = read_mem(cpu, bus, cpu->sp);
+                uint8_t hi = read_mem(cpu, bus, cpu->sp + 1);
                 cpu->sp += 2;
                 cpu->pc = (uint16_t)hi << 8 | lo;
             }
@@ -1391,7 +1390,7 @@ int cpu_step(CPU *cpu, MMU *mmu, Cartridge *cart, Timer *timer) {
             break;
         case 0xCA: /* JP Z, a16 */
             {
-                uint16_t addr = read_word(cpu, mmu, cart, timer);
+                uint16_t addr = read_word(cpu, bus);
                 if (cpu->f & FLAG_Z) {
                     cpu->pc = addr;
                     cycles = 16;
@@ -1402,13 +1401,13 @@ int cpu_step(CPU *cpu, MMU *mmu, Cartridge *cart, Timer *timer) {
             break;
         case 0xCB: /* CB prefix */
             {
-                uint8_t cb = read_byte(cpu, mmu, cart, timer);
+                uint8_t cb = read_byte(cpu, bus);
                 uint8_t reg_idx = cb & 0x07;
                 uint8_t op = (cb >> 3) & 0x07;
                 uint8_t val;
 
                 if (reg_idx == 6) {
-                    val = read_mem(cpu, mmu, cart, timer, (uint16_t)cpu->h << 8 | cpu->l);
+                    val = read_mem(cpu, bus, (uint16_t)cpu->h << 8 | cpu->l);
                 } else {
                     uint8_t *regs[] = {&cpu->b, &cpu->c, &cpu->d, &cpu->e, &cpu->h, &cpu->l, NULL, &cpu->a};
                     val = *regs[reg_idx];
@@ -1451,7 +1450,7 @@ int cpu_step(CPU *cpu, MMU *mmu, Cartridge *cart, Timer *timer) {
                         cpu->f = (new_c ? FLAG_C : 0) | (val == 0 ? FLAG_Z : 0);
                     }
                     if (reg_idx == 6) {
-                        write_mem(cpu, mmu, cart, timer, (uint16_t)cpu->h << 8 | cpu->l, val);
+                        write_mem(cpu, bus, (uint16_t)cpu->h << 8 | cpu->l, val);
                         cycles = 16;
                     } else {
                         uint8_t *regs[] = {&cpu->b, &cpu->c, &cpu->d, &cpu->e, &cpu->h, &cpu->l, NULL, &cpu->a};
@@ -1466,7 +1465,7 @@ int cpu_step(CPU *cpu, MMU *mmu, Cartridge *cart, Timer *timer) {
                     uint8_t bit = op;
                     val &= ~(1 << bit);
                     if (reg_idx == 6) {
-                        write_mem(cpu, mmu, cart, timer, (uint16_t)cpu->h << 8 | cpu->l, val);
+                        write_mem(cpu, bus, (uint16_t)cpu->h << 8 | cpu->l, val);
                         cycles = 16;
                     } else {
                         uint8_t *regs[] = {&cpu->b, &cpu->c, &cpu->d, &cpu->e, &cpu->h, &cpu->l, NULL, &cpu->a};
@@ -1477,7 +1476,7 @@ int cpu_step(CPU *cpu, MMU *mmu, Cartridge *cart, Timer *timer) {
                     uint8_t bit = op;
                     val |= (1 << bit);
                     if (reg_idx == 6) {
-                        write_mem(cpu, mmu, cart, timer, (uint16_t)cpu->h << 8 | cpu->l, val);
+                        write_mem(cpu, bus, (uint16_t)cpu->h << 8 | cpu->l, val);
                         cycles = 16;
                     } else {
                         uint8_t *regs[] = {&cpu->b, &cpu->c, &cpu->d, &cpu->e, &cpu->h, &cpu->l, NULL, &cpu->a};
@@ -1489,10 +1488,10 @@ int cpu_step(CPU *cpu, MMU *mmu, Cartridge *cart, Timer *timer) {
             break;
         case 0xCC: /* CALL Z, a16 */
             {
-                uint16_t addr = read_word(cpu, mmu, cart, timer);
+                uint16_t addr = read_word(cpu, bus);
                 cycles = 12;
                 if (cpu->f & FLAG_Z) {
-                    push(cpu, mmu, cart, timer, cpu->pc >> 8, cpu->pc & 0xFF);
+                    push(cpu, bus, cpu->pc >> 8, cpu->pc & 0xFF);
                     cpu->pc = addr;
                     cycles = 24;
                 }
@@ -1500,15 +1499,15 @@ int cpu_step(CPU *cpu, MMU *mmu, Cartridge *cart, Timer *timer) {
             break;
         case 0xCD: /* CALL a16 */
             {
-                uint16_t addr = read_word(cpu, mmu, cart, timer);
-                push(cpu, mmu, cart, timer, cpu->pc >> 8, cpu->pc & 0xFF);
+                uint16_t addr = read_word(cpu, bus);
+                push(cpu, bus, cpu->pc >> 8, cpu->pc & 0xFF);
                 cpu->pc = addr;
             }
             cycles = 24;
             break;
         case 0xCE: /* ADC A, d8 */
             {
-                uint8_t val = read_byte(cpu, mmu, cart, timer);
+                uint8_t val = read_byte(cpu, bus);
                 uint8_t c = (cpu->f & FLAG_C) ? 1 : 0;
                 uint16_t sum = cpu->a + val + c;
                 cpu->f = (sum > 0xFF ? FLAG_C : 0) |
@@ -1519,27 +1518,27 @@ int cpu_step(CPU *cpu, MMU *mmu, Cartridge *cart, Timer *timer) {
             cycles = 8;
             break;
         case 0xCF: /* RST 08H */
-            push(cpu, mmu, cart, timer, cpu->pc >> 8, cpu->pc & 0xFF);
+            push(cpu, bus, cpu->pc >> 8, cpu->pc & 0xFF);
             cpu->pc = 0x0008;
             cycles = 16;
             break;
         case 0xD0: /* RET NC */
             cycles = 8;
             if (!(cpu->f & FLAG_C)) {
-                uint8_t lo = read_mem(cpu, mmu, cart, timer, cpu->sp);
-                uint8_t hi = read_mem(cpu, mmu, cart, timer, cpu->sp + 1);
+                uint8_t lo = read_mem(cpu, bus, cpu->sp);
+                uint8_t hi = read_mem(cpu, bus, cpu->sp + 1);
                 cpu->sp += 2;
                 cpu->pc = (uint16_t)hi << 8 | lo;
                 cycles = 20;
             }
             break;
         case 0xD1: /* POP DE */
-            pop(cpu, mmu, cart, timer, &cpu->d, &cpu->e);
+            pop(cpu, bus, &cpu->d, &cpu->e);
             cycles = 12;
             break;
         case 0xD2: /* JP NC, a16 */
             {
-                uint16_t addr = read_word(cpu, mmu, cart, timer);
+                uint16_t addr = read_word(cpu, bus);
                 if (!(cpu->f & FLAG_C)) {
                     cpu->pc = addr;
                     cycles = 16;
@@ -1553,22 +1552,22 @@ int cpu_step(CPU *cpu, MMU *mmu, Cartridge *cart, Timer *timer) {
             break;
         case 0xD4: /* CALL NC, a16 */
             {
-                uint16_t addr = read_word(cpu, mmu, cart, timer);
+                uint16_t addr = read_word(cpu, bus);
                 cycles = 12;
                 if (!(cpu->f & FLAG_C)) {
-                    push(cpu, mmu, cart, timer, cpu->pc >> 8, cpu->pc & 0xFF);
+                    push(cpu, bus, cpu->pc >> 8, cpu->pc & 0xFF);
                     cpu->pc = addr;
                     cycles = 24;
                 }
             }
             break;
         case 0xD5: /* PUSH DE */
-            push(cpu, mmu, cart, timer, cpu->d, cpu->e);
+            push(cpu, bus, cpu->d, cpu->e);
             cycles = 16;
             break;
         case 0xD6: /* SUB d8 */
             {
-                uint8_t val = read_byte(cpu, mmu, cart, timer);
+                uint8_t val = read_byte(cpu, bus);
                 cpu->f = FLAG_N |
                          (cpu->a < val ? FLAG_C : 0) |
                          ((cpu->a & 0x0F) < (val & 0x0F) ? FLAG_H : 0);
@@ -1578,15 +1577,15 @@ int cpu_step(CPU *cpu, MMU *mmu, Cartridge *cart, Timer *timer) {
             cycles = 8;
             break;
         case 0xD7: /* RST 10H */
-            push(cpu, mmu, cart, timer, cpu->pc >> 8, cpu->pc & 0xFF);
+            push(cpu, bus, cpu->pc >> 8, cpu->pc & 0xFF);
             cpu->pc = 0x0010;
             cycles = 16;
             break;
         case 0xD8: /* RET C */
             cycles = 8;
             if (cpu->f & FLAG_C) {
-                uint8_t lo = read_mem(cpu, mmu, cart, timer, cpu->sp);
-                uint8_t hi = read_mem(cpu, mmu, cart, timer, cpu->sp + 1);
+                uint8_t lo = read_mem(cpu, bus, cpu->sp);
+                uint8_t hi = read_mem(cpu, bus, cpu->sp + 1);
                 cpu->sp += 2;
                 cpu->pc = (uint16_t)hi << 8 | lo;
                 cycles = 20;
@@ -1594,8 +1593,8 @@ int cpu_step(CPU *cpu, MMU *mmu, Cartridge *cart, Timer *timer) {
             break;
         case 0xD9: /* RETI */
             {
-                uint8_t lo = read_mem(cpu, mmu, cart, timer, cpu->sp);
-                uint8_t hi = read_mem(cpu, mmu, cart, timer, cpu->sp + 1);
+                uint8_t lo = read_mem(cpu, bus, cpu->sp);
+                uint8_t hi = read_mem(cpu, bus, cpu->sp + 1);
                 cpu->sp += 2;
                 cpu->pc = (uint16_t)hi << 8 | lo;
             }
@@ -1604,7 +1603,7 @@ int cpu_step(CPU *cpu, MMU *mmu, Cartridge *cart, Timer *timer) {
             break;
         case 0xDA: /* JP C, a16 */
             {
-                uint16_t addr = read_word(cpu, mmu, cart, timer);
+                uint16_t addr = read_word(cpu, bus);
                 if (cpu->f & FLAG_C) {
                     cpu->pc = addr;
                     cycles = 16;
@@ -1615,10 +1614,10 @@ int cpu_step(CPU *cpu, MMU *mmu, Cartridge *cart, Timer *timer) {
             break;
         case 0xDC: /* CALL C, a16 */
             {
-                uint16_t addr = read_word(cpu, mmu, cart, timer);
+                uint16_t addr = read_word(cpu, bus);
                 cycles = 12;
                 if (cpu->f & FLAG_C) {
-                    push(cpu, mmu, cart, timer, cpu->pc >> 8, cpu->pc & 0xFF);
+                    push(cpu, bus, cpu->pc >> 8, cpu->pc & 0xFF);
                     cpu->pc = addr;
                     cycles = 24;
                 }
@@ -1626,7 +1625,7 @@ int cpu_step(CPU *cpu, MMU *mmu, Cartridge *cart, Timer *timer) {
             break;
         case 0xDE: /* SBC A, d8 */
             {
-                uint8_t val = read_byte(cpu, mmu, cart, timer);
+                uint8_t val = read_byte(cpu, bus);
                 uint8_t c = (cpu->f & FLAG_C) ? 1 : 0;
                 uint16_t res = cpu->a - val - c;
                 cpu->f = FLAG_N |
@@ -1638,36 +1637,36 @@ int cpu_step(CPU *cpu, MMU *mmu, Cartridge *cart, Timer *timer) {
             cycles = 8;
             break;
         case 0xDF: /* RST 18H */
-            push(cpu, mmu, cart, timer, cpu->pc >> 8, cpu->pc & 0xFF);
+            push(cpu, bus, cpu->pc >> 8, cpu->pc & 0xFF);
             cpu->pc = 0x0018;
             cycles = 16;
             break;
         case 0xE0: /* LDH (a8), A */
             {
-                uint8_t n = read_byte(cpu, mmu, cart, timer);
-                write_mem(cpu, mmu, cart, timer, 0xFF00 | n , cpu->a);
+                uint8_t n = read_byte(cpu, bus);
+                write_mem(cpu, bus, 0xFF00 | n , cpu->a);
             }
             cycles = 12;
             break;
         case 0xE1: /* POP HL */
-            pop(cpu, mmu, cart, timer, &cpu->h, &cpu->l);
+            pop(cpu, bus, &cpu->h, &cpu->l);
             cycles = 12;
             break;
         case 0xE2: /* LD (C), A */
-            write_mem(cpu, mmu, cart, timer, 0xFF00 | cpu->c, cpu->a);
+            write_mem(cpu, bus, 0xFF00 | cpu->c, cpu->a);
             cycles = 8;
             break;
         case 0xE3: /* ILLEGAL */
         case 0xE4: /* ILLEGAL */
-            { read_byte(cpu, mmu, cart, timer); cycles = 4; }
+            { read_byte(cpu, bus); cycles = 4; }
             break;
         case 0xE5: /* PUSH HL */
-            push(cpu, mmu, cart, timer, cpu->h, cpu->l);
+            push(cpu, bus, cpu->h, cpu->l);
             cycles = 16;
             break;
         case 0xE6: /* AND d8 */
             {
-                uint8_t val = read_byte(cpu, mmu, cart, timer);
+                uint8_t val = read_byte(cpu, bus);
                 cpu->a &= val;
                 cpu->f = FLAG_H | (cpu->a == 0 ? FLAG_Z : 0);
             }
@@ -1675,7 +1674,7 @@ int cpu_step(CPU *cpu, MMU *mmu, Cartridge *cart, Timer *timer) {
             break;
         case 0xE8: /* ADD SP, r8 */
             {
-                int8_t offset = (int8_t)read_byte(cpu, mmu, cart, timer);
+                int8_t offset = (int8_t)read_byte(cpu, bus);
                 cpu->f = ((cpu->sp & 0xFF) + (offset & 0xFF) > 0xFF ? FLAG_C : 0) |
                          ((cpu->sp & 0x0F) + (offset & 0x0F) > 0x0F ? FLAG_H : 0);
                 cpu->sp += offset;
@@ -1688,47 +1687,47 @@ int cpu_step(CPU *cpu, MMU *mmu, Cartridge *cart, Timer *timer) {
             break;
         case 0xEA: /* LD (a16), A */
             {
-                uint16_t addr = read_word(cpu, mmu, cart, timer);
-                write_mem(cpu, mmu, cart, timer, addr, cpu->a);
+                uint16_t addr = read_word(cpu, bus);
+                write_mem(cpu, bus, addr, cpu->a);
             }
             cycles = 16;
             break;
         case 0xEE: /* XOR d8 */
             {
-                uint8_t val = read_byte(cpu, mmu, cart, timer);
+                uint8_t val = read_byte(cpu, bus);
                 cpu->a ^= val;
                 cpu->f = (cpu->a == 0 ? FLAG_Z : 0);
             }
             cycles = 8;
             break;
         case 0xEF: /* RST 28H */
-            push(cpu, mmu, cart, timer, cpu->pc >> 8, cpu->pc & 0xFF);
+            push(cpu, bus, cpu->pc >> 8, cpu->pc & 0xFF);
             cpu->pc = 0x0028;
             cycles = 16;
             break;
         case 0xE7: /* RST 20H */
-            push(cpu, mmu, cart, timer, cpu->pc >> 8, cpu->pc & 0xFF);
+            push(cpu, bus, cpu->pc >> 8, cpu->pc & 0xFF);
             cpu->pc = 0x0020;
             cycles = 16;
             break;
         case 0xF0: /* LDH A, (a8) */
             {
-                uint8_t n = read_byte(cpu, mmu, cart, timer);
-                cpu->a = read_mem(cpu, mmu, cart, timer, 0xFF00 | n);
+                uint8_t n = read_byte(cpu, bus);
+                cpu->a = read_mem(cpu, bus, 0xFF00 | n);
             }
             cycles = 12;
             break;
         case 0xF1: /* POP AF */
             {
                 uint8_t lo, hi;
-                pop(cpu, mmu, cart, timer, &hi, &lo);
+                pop(cpu, bus, &hi, &lo);
                 cpu->a = hi;
                 cpu->f = lo & 0xF0;
             }
             cycles = 12;
             break;
         case 0xF2: /* LD A, (C) */
-            cpu->a = read_mem(cpu, mmu, cart, timer, 0xFF00 | cpu->c);
+            cpu->a = read_mem(cpu, bus, 0xFF00 | cpu->c);
             cycles = 8;
             break;
         case 0xF3: /* DI */
@@ -1737,25 +1736,25 @@ int cpu_step(CPU *cpu, MMU *mmu, Cartridge *cart, Timer *timer) {
             cycles = 4;
             break;
         case 0xF5: /* PUSH AF */
-            push(cpu, mmu, cart, timer, cpu->a, cpu->f);
+            push(cpu, bus, cpu->a, cpu->f);
             cycles = 16;
             break;
         case 0xF6: /* OR d8 */
             {
-                uint8_t val = read_byte(cpu, mmu, cart, timer);
+                uint8_t val = read_byte(cpu, bus);
                 cpu->a |= val;
                 cpu->f = (cpu->a == 0 ? FLAG_Z : 0);
             }
             cycles = 8;
             break;
         case 0xF7: /* RST 30H */
-            push(cpu, mmu, cart, timer, cpu->pc >> 8, cpu->pc & 0xFF);
+            push(cpu, bus, cpu->pc >> 8, cpu->pc & 0xFF);
             cpu->pc = 0x0030;
             cycles = 16;
             break;
         case 0xF8: /* LD HL, SP+r8 */
             {
-                int8_t offset = (int8_t)read_byte(cpu, mmu, cart, timer);
+                int8_t offset = (int8_t)read_byte(cpu, bus);
                 cpu->f = ((cpu->sp & 0xFF) + (offset & 0xFF) > 0xFF ? FLAG_C : 0) |
                          ((cpu->sp & 0x0F) + (offset & 0x0F) > 0x0F ? FLAG_H : 0);
                 uint16_t result = cpu->sp + offset;
@@ -1770,8 +1769,8 @@ int cpu_step(CPU *cpu, MMU *mmu, Cartridge *cart, Timer *timer) {
             break;
         case 0xFA: /* LD A, (a16) */
             {
-                uint16_t addr = read_word(cpu, mmu, cart, timer);
-                cpu->a = read_mem(cpu, mmu, cart, timer, addr);
+                uint16_t addr = read_word(cpu, bus);
+                cpu->a = read_mem(cpu, bus, addr);
             }
             cycles = 16;
             break;
@@ -1781,7 +1780,7 @@ int cpu_step(CPU *cpu, MMU *mmu, Cartridge *cart, Timer *timer) {
             break;
         case 0xFE: /* CP d8 */
             {
-                uint8_t val = read_byte(cpu, mmu, cart, timer);
+                uint8_t val = read_byte(cpu, bus);
                 cpu->f = FLAG_N |
                          (cpu->a < val ? FLAG_C : 0) |
                          ((cpu->a & 0x0F) < (val & 0x0F) ? FLAG_H : 0) |
@@ -1790,7 +1789,7 @@ int cpu_step(CPU *cpu, MMU *mmu, Cartridge *cart, Timer *timer) {
             cycles = 8;
             break;
         case 0xFF: /* RST 38H */
-            push(cpu, mmu, cart, timer, cpu->pc >> 8, cpu->pc & 0xFF);
+            push(cpu, bus, cpu->pc >> 8, cpu->pc & 0xFF);
             cpu->pc = 0x0038;
             cycles = 16;
             break;

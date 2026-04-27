@@ -54,6 +54,16 @@ scripts/      → Build and utility scripts
 ./scripts/serve.sh
 ```
 
+### Test Commands
+
+```
+# Run unit tests
+./scripts/test.sh
+
+# Run mooneye test suite
+./scripts/run-mooneye.sh ./mooneye-test-suite
+```
+
 ## Testing Strategy
 
 - **Unit tests**: C unit tests for CPU instructions, MMU mapping, etc.

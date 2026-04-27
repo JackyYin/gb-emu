@@ -14,6 +14,7 @@ set(CORE_SOURCES
     src/core/timer.c
     src/core/serial.c
     src/core/gameboy.c
+    src/core/oam.c
 )
 
 set(PLATFORM_WASM_SOURCES
