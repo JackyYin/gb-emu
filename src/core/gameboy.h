@@ -58,8 +58,8 @@ typedef struct {
 } APU;
 
 typedef struct {
-    uint32_t div_counter;
-    uint32_t tima_counter;
+    bool     reload_fired;      /* wait until TIMA reload (4 T-cycles) */
+    uint16_t sys_counter;       /* internal 16-bit counter; DIV = sys_counter >> 8 */
 } Timer;
 
 typedef struct {
@@ -113,6 +113,9 @@ uint8_t mmu_read_byte(Bus *bus, uint16_t addr);
 void mmu_write_byte(Bus *bus, uint16_t addr, uint8_t value);
 void timer_tick(Bus *bus, uint32_t cycles);
 void timer_init(MMU *mmu, Timer *timer);
+void timer_div_write(Bus *bus);
+void timer_tima_write(Bus *bus, uint8_t value);
+void timer_tac_write(Bus *bus, uint8_t value);
 void serial_tick(Bus *bus, Serial *serial, uint32_t cycles);
 void serial_init(Serial *serial);
 void cart_init(Cartridge *cart);

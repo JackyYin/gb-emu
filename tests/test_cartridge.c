@@ -51,8 +51,8 @@ static void test_timer_init(void) {
     ASSERT_EQ(0, mmu.io[0x05], "Timer TIMA init 0");
     ASSERT_EQ(0, mmu.io[0x06], "Timer TMA init 0");
     ASSERT_EQ(0, mmu.io[0x07], "Timer TAC init 0");
-    ASSERT_EQ(0, timer.div_counter, "Timer div_counter init 0");
-    ASSERT_EQ(0, timer.tima_counter, "Timer tima_counter init 0");
+    ASSERT_EQ(0, timer.sys_counter, "Timer sys_counter init 0");
+    ASSERT_EQ(0, timer.reload_fired, "Timer reload_fired init 0");
 }
 
 static void test_timer_tick_div(void) {
@@ -92,11 +92,14 @@ static void test_timer_tick_tima(void) {
     ASSERT_EQ(1, mmu.io[0x05], "TIMA increments after 256 cycles with TAC=0x07");
 
     mmu.io[0x05] = 0xFF;
-    timer.tima_counter = 0;
     mmu.io[0x0F] = 0;
     timer_tick(&b, 256);
-    ASSERT_EQ(mmu.io[0x06], mmu.io[0x05], "TIMA resets to TMA on overflow");
-    ASSERT_EQ(0x04, mmu.io[0x0F], "Timer interrupt requested on overflow");
+    /* TIMA reads 0 during the 4T reload window; interrupt not yet fired */
+    ASSERT_EQ(0, mmu.io[0x05], "TIMA reads 0 during reload window");
+    ASSERT_EQ(0, mmu.io[0x0F], "Timer interrupt not yet requested during reload window");
+    timer_tick(&b, 4); /* complete the 4T reload delay */
+    ASSERT_EQ(mmu.io[0x06], mmu.io[0x05], "TIMA resets to TMA after reload");
+    ASSERT_EQ(0x04, mmu.io[0x0F], "Timer interrupt requested after reload");
 }
 
 static void test_timer_div_reset(void) {
@@ -112,7 +115,7 @@ static void test_timer_div_reset(void) {
 
     mmu_write_byte(&b, 0xFF04, 0x00);
     ASSERT_EQ(0, mmu.io[0x04], "DIV reset after write to 0xFF04");
-    ASSERT_EQ(0, timer.div_counter, "DIV counter reset after write to 0xFF04");
+    ASSERT_EQ(0, timer.sys_counter, "DIV counter reset after write to 0xFF04");
 }
 
 static void test_timer_tma_write(void) {

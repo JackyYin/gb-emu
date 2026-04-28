@@ -237,20 +237,13 @@ void mmu_write_byte(Bus *bus, uint16_t addr, uint8_t value) {
     }
     if (addr >= 0xFF04 && addr <= 0xFF07) {
         if (addr == 0xFF04) {
-            /* Writing any value resets DIV to 0 */
-            mmu->io[0x04] = 0;
-            timer->div_counter = 0;
+            timer_div_write(bus);
         } else if (addr == 0xFF05) {
-            mmu->io[0x05] = value;
+            timer_tima_write(bus, value);
         } else if (addr == 0xFF06) {
             mmu->io[0x06] = value;
-            /* If TIMA has overflowed, reload immediately */
-            if (mmu->io[0x05] == 0) {
-                mmu->io[0x05] = value;
-            }
         } else if (addr == 0xFF07) {
-            mmu->io[0x07] = value & 0x07;
-            timer->tima_counter = 0;
+            timer_tac_write(bus, value);
         }
         return;
     }
