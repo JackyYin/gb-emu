@@ -54,6 +54,13 @@ scripts/      → Build and utility scripts
 ./scripts/serve.sh
 ```
 
+
+## Testing Strategy
+
+- **Unit tests**: C unit tests for CPU instructions, MMU mapping, etc.
+- **Mooneye test suite**: Run Mooneye test suite
+- **Integration**: Load commercial ROMs and verify gameplay
+
 ### Test Commands
 
 ```
@@ -63,12 +70,6 @@ scripts/      → Build and utility scripts
 # Run mooneye test suite
 ./scripts/run-mooneye.sh ./mooneye-test-suite
 ```
-
-## Testing Strategy
-
-- **Unit tests**: C unit tests for CPU instructions, MMU mapping, etc.
-- **Blargg ROMs**: Run official Game Boy test ROMs
-- **Integration**: Load commercial ROMs and verify gameplay
 
 ## Git Conventions
 
