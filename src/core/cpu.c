@@ -97,7 +97,7 @@ int cpu_step(CPU *cpu, Bus *bus) {
     int cycles = 0;
 
     if (cpu->halted) {
-        uint8_t ie = mmu->io[0x7F];
+        uint8_t ie = mmu->ie;
         uint8_t if_ = mmu->io[0x0F];
         uint8_t pending = ie & if_;
         if (pending) {
@@ -116,7 +116,7 @@ int cpu_step(CPU *cpu, Bus *bus) {
     }
 
     if (cpu->ime) {
-        uint8_t ie = mmu->io[0x7F];
+        uint8_t ie = mmu->ie;
         uint8_t if_ = mmu->io[0x0F];
         uint8_t pending = ie & if_;
         if (pending)

@@ -155,7 +155,7 @@ uint8_t mmu_read_byte(Bus *bus, uint16_t addr) {
     if (addr < 0xFFFF) {
         return mmu->hram[addr - 0xFF80];
     }
-    return mmu->io[0x7F];  /* IE register */
+    return mmu->ie;  /* IE register */
 }
 
 
@@ -225,29 +225,29 @@ void mmu_write_byte(Bus *bus, uint16_t addr, uint8_t value) {
         mmu->io[0x00] = (value & 0x30);
         return;
     }
-    /* Serial transfer Data */
-    if (addr == 0xFF01) {
-        mmu->io[0x01] = value;
-        return;
-    }
-    /* Serial transfer Control */
-    if (addr == 0xFF02) {
-        mmu->io[0x02] = value;
-        return;
-    }
-    if (addr >= 0xFF04 && addr <= 0xFF07) {
-        if (addr == 0xFF04) {
-            timer_div_write(bus);
-        } else if (addr == 0xFF05) {
-            timer_tima_write(bus, value);
-        } else if (addr == 0xFF06) {
-            mmu->io[0x06] = value;
-        } else if (addr == 0xFF07) {
-            timer_tac_write(bus, value);
-        }
-        return;
-    }
     if (addr < 0xFF80) {
+        /* Serial transfer Data */
+        if (addr == 0xFF01) {
+            mmu->io[0x01] = value;
+            return;
+        }
+        /* Serial transfer Control */
+        if (addr == 0xFF02) {
+            mmu->io[0x02] = value;
+            return;
+        }
+        if (addr >= 0xFF04 && addr <= 0xFF07) {
+            if (addr == 0xFF04) {
+                timer_div_write(bus);
+            } else if (addr == 0xFF05) {
+                timer_tima_write(bus, value);
+            } else if (addr == 0xFF06) {
+                mmu->io[0x06] = value;
+            } else if (addr == 0xFF07) {
+                timer_tac_write(bus, value);
+            }
+            return;
+        }
         if (addr == 0xFF44) {
             mmu->io[0x44] = 0;
             return;
@@ -281,7 +281,7 @@ void mmu_write_byte(Bus *bus, uint16_t addr, uint8_t value) {
         mmu->hram[addr - 0xFF80] = value;
         return;
     }
-    mmu->io[0x7F] = value;
+    mmu->ie = value;
 }
 
 void mmu_init(MMU *mmu) {
@@ -291,4 +291,5 @@ void mmu_init(MMU *mmu) {
     for (int i = 0; i < sizeof(mmu->oam); i++) mmu->oam[i] = 0;
     for (int i = 0; i < sizeof(mmu->io); i++) mmu->io[i] = 0;
     mmu->joypad = 0xFF;  /* all buttons released */
+    mmu->ie = 0;
 }

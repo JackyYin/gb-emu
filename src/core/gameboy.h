@@ -25,6 +25,7 @@ typedef struct {
     uint8_t hram[0x80];
     uint8_t oam[0xA0];
     uint8_t io[0x80];
+    uint8_t ie;
     uint32_t framebuffer[SCREEN_W * SCREEN_H];
     /*  bit 0 = Right (d-pad) / A (buttons) */
     /*  bit 1 = Left (d-pad) / B (buttons) */
