@@ -68,8 +68,11 @@ typedef struct {
 } Serial;
 
 typedef struct {
-    uint8_t dma_offset;
-    bool transferring;
+    /*  bit 0 = Transferring */
+    /*  bit 1 = Just Triggered */
+    /*  bit 2 = Delay for 1 M-cycle */
+    uint8_t  status;
+    uint8_t  offset;
 } OAM;
 
 typedef struct {

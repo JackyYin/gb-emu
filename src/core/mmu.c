@@ -100,6 +100,7 @@ uint8_t mmu_read_byte(Bus *bus, uint16_t addr) {
     MMU *mmu = bus->mmu;
     Cartridge *cart = bus->cart;
     Timer *timer = bus->timer;
+    OAM *oam = bus->oam;
     if (addr < 0x100 && cart->boot_rom_enabled && cart->boot_rom) {
         return cart->boot_rom[addr];
     }
@@ -128,6 +129,9 @@ uint8_t mmu_read_byte(Bus *bus, uint16_t addr) {
         return mmu->wram[addr - 0xE000];
     }
     if (addr < 0xFEA0) {
+        /* OAM bus lockout */
+        if ((oam->status & 0x01) != 0 && (oam->status & 0x06) == 0)
+            return 0xFF;
         return mmu->oam[addr - 0xFE00];
     }
     if (addr < 0xFF00) {
@@ -176,6 +180,7 @@ void mmu_write_byte(Bus *bus, uint16_t addr, uint8_t value) {
     MMU *mmu = bus->mmu;
     Cartridge *cart = bus->cart;
     Timer *timer = bus->timer;
+    OAM *oam = bus->oam;
     if (addr < 0x8000) {
         // MBC 1
         if (cart->type >= 0x01 && cart->type <= 0x03) {
@@ -257,8 +262,19 @@ void mmu_write_byte(Bus *bus, uint16_t addr, uint8_t value) {
         /* triggering DMA transfer */
         if (addr == 0xFF46) {
             mmu->io[0x46] = value;
-            bus->oam->dma_offset = 0;
-            bus->oam->transferring = true;
+            /* - 0x01 = transferring */
+            /* - 0x02 = just_triggered (skip tick) */
+            /* - 0x04 = grace period (OAM accessible, 4 T-cycle delay) */
+            if ((oam->status & 0x01) == 0) {
+                /* Fresh DMA: 1 M-cycle (4 T-cycle) grace before OAM locks */
+                oam->status |= 0x04;
+            } else {
+                /* Restart: no grace (OAM stays locked), but skip trigger tick for copy timing */
+                oam->status = (oam->status & ~0x04);
+            }
+            /* Set just-triggered bits when DMA start and restart */
+            oam->status |= 0x03;
+            oam->offset = 0;
             return;
         }
         if (addr == 0xFF50) {
