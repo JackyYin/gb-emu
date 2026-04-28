@@ -39,6 +39,53 @@ static void pop(CPU *cpu, Bus *bus, uint8_t *hi, uint8_t *lo) {
     cpu->sp += 2;
 }
 
+static int handle_isr(CPU *cpu, Bus *bus, uint8_t pending) {
+    MMU *mmu = bus->mmu;
+    cpu->ime = false;
+    cpu->ime_delay = false;
+    if (pending & 0x01) {
+        mmu->io[0x0F] &= ~0x01;
+        cpu->sp -= 2;
+        write_mem(cpu, bus, cpu->sp, cpu->pc & 0xFF);
+        write_mem(cpu, bus, cpu->sp + 1, cpu->pc >> 8);
+        cpu->pc = 0x0040;
+        return 20;
+    }
+    if (pending & 0x02) {
+        mmu->io[0x0F] &= ~0x02;
+        cpu->sp -= 2;
+        write_mem(cpu, bus, cpu->sp, cpu->pc & 0xFF);
+        write_mem(cpu, bus, cpu->sp + 1, cpu->pc >> 8);
+        cpu->pc = 0x0048;
+        return 20;
+    }
+    if (pending & 0x04) {
+        mmu->io[0x0F] &= ~0x04;
+        cpu->sp -= 2;
+        write_mem(cpu, bus, cpu->sp, cpu->pc & 0xFF);
+        write_mem(cpu, bus, cpu->sp + 1, cpu->pc >> 8);
+        cpu->pc = 0x0050;
+        return 20;
+    }
+    if (pending & 0x08) {
+        mmu->io[0x0F] &= ~0x08;
+        cpu->sp -= 2;
+        write_mem(cpu, bus, cpu->sp, cpu->pc & 0xFF);
+        write_mem(cpu, bus, cpu->sp + 1, cpu->pc >> 8);
+        cpu->pc = 0x0058;
+        return 20;
+    }
+    if (pending & 0x10) {
+        mmu->io[0x0F] &= ~0x10;
+        cpu->sp -= 2;
+        write_mem(cpu, bus, cpu->sp, cpu->pc & 0xFF);
+        write_mem(cpu, bus, cpu->sp + 1, cpu->pc >> 8);
+        cpu->pc = 0x0060;
+        return 20;
+    }
+    return 0;
+}
+
 /*
  *  1 M-cycle = 4 T-cycles, always.
  *  T-cycle = the crystal oscillator tick  (4,194,304 per second)
@@ -52,8 +99,13 @@ int cpu_step(CPU *cpu, Bus *bus) {
     if (cpu->halted) {
         uint8_t ie = mmu->io[0x7F];
         uint8_t if_ = mmu->io[0x0F];
-        if (ie & if_) {
+        uint8_t pending = ie & if_;
+        if (pending) {
             cpu->halted = false;
+            if (cpu->ime) {
+                return 4 + handle_isr(cpu, bus, pending);
+            }
+            return 4;
         }
         return 4;
     }
@@ -67,50 +119,8 @@ int cpu_step(CPU *cpu, Bus *bus) {
         uint8_t ie = mmu->io[0x7F];
         uint8_t if_ = mmu->io[0x0F];
         uint8_t pending = ie & if_;
-        if (pending) {
-            cpu->ime = false;
-            cpu->ime_delay = false;
-            if (pending & 0x01) {
-                mmu->io[0x0F] &= ~0x01;
-                cpu->sp -= 2;
-                write_mem(cpu, bus, cpu->sp, cpu->pc & 0xFF);
-                write_mem(cpu, bus, cpu->sp + 1, cpu->pc >> 8);
-                cpu->pc = 0x0040;
-                return 20;
-            }
-            if (pending & 0x02) {
-                mmu->io[0x0F] &= ~0x02;
-                cpu->sp -= 2;
-                write_mem(cpu, bus, cpu->sp, cpu->pc & 0xFF);
-                write_mem(cpu, bus, cpu->sp + 1, cpu->pc >> 8);
-                cpu->pc = 0x0048;
-                return 20;
-            }
-            if (pending & 0x04) {
-                mmu->io[0x0F] &= ~0x04;
-                cpu->sp -= 2;
-                write_mem(cpu, bus, cpu->sp, cpu->pc & 0xFF);
-                write_mem(cpu, bus, cpu->sp + 1, cpu->pc >> 8);
-                cpu->pc = 0x0050;
-                return 20;
-            }
-            if (pending & 0x08) {
-                mmu->io[0x0F] &= ~0x08;
-                cpu->sp -= 2;
-                write_mem(cpu, bus, cpu->sp, cpu->pc & 0xFF);
-                write_mem(cpu, bus, cpu->sp + 1, cpu->pc >> 8);
-                cpu->pc = 0x0058;
-                return 20;
-            }
-            if (pending & 0x10) {
-                mmu->io[0x0F] &= ~0x10;
-                cpu->sp -= 2;
-                write_mem(cpu, bus, cpu->sp, cpu->pc & 0xFF);
-                write_mem(cpu, bus, cpu->sp + 1, cpu->pc >> 8);
-                cpu->pc = 0x0060;
-                return 20;
-            }
-        }
+        if (pending)
+            return handle_isr(cpu, bus, pending);
     }
 
     opcode = read_byte(cpu, bus);
